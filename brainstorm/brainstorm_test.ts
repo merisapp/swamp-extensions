@@ -162,6 +162,22 @@ Deno.test("updateIdea commits a draft in place without a second record", async (
   assertEquals(written[0].data.status, "seed");
 });
 
+Deno.test("an empty project leaves the existing project alone", async () => {
+  const { context, getWrittenResources } = createModelTestContext({
+    storedResources: { "offline-sync": storedIdea({ project: "myapp" }) },
+  });
+  await behavior.methods.updateIdea.execute(
+    { id: "offline-sync", project: "" },
+    context,
+  );
+  assertEquals(getWrittenResources()[0].data.project, "myapp");
+  await behavior.methods.updateIdea.execute(
+    { id: "offline-sync", project: "other" },
+    context,
+  );
+  assertEquals(getWrittenResources()[1].data.project, "other");
+});
+
 Deno.test("updateIdea fails for an idea that does not exist", async () => {
   const { context } = createModelTestContext();
   await assertRejects(

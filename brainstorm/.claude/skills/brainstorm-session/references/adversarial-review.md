@@ -13,8 +13,21 @@ built with them. It uses the same model as you.
    any `swamp` command that writes, and not to edit files.
 3. Check its answer against the rules below (at most seven findings, every
    finding has a basis, no fixes). Send it back if it breaks them.
-4. Record it with `recordCritique`, show the findings to the person most severe
-   first, and record each of their answers with `respondToFinding`.
+4. Record it, show the findings to the person most severe first, and record each
+   of their answers. Where depends on the situation:
+   - **During a session** (the factory's `review` stage): the idea is not stored
+     yet, so record the findings as the session's `review` artifact and resolve
+     each with the person's answer (`resolve_findings`). Convert the reviewer's
+     JSON: `fatal` is `critical`, `serious` is `high`, `minor` is `low`; `claim`
+     becomes `description` with the basis and confidence appended
+     (`"<claim> (basis: research; high confidence)"`); the lens goes in
+     `category`; number them `ADV-1`, `ADV-2`... The strengths, riskiest
+     assumption and what would change the reviewer's mind go in the `note` you
+     show the person; they are not part of the artifact. The shapes are in
+     factory-driving.md.
+   - **On a stored idea, later**: `recordCritique` with the reviewer's JSON as
+     is, and `respondToFinding` for each answer. That keeps the review with the
+     idea permanently and shows it in the index.
 
 ## Prompt for the reviewer
 

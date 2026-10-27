@@ -241,7 +241,9 @@ export function applyIdeaPatch(
     summary: patch.summary ?? base.summary,
     status: patch.status ?? base.status,
     tags: patch.tags ?? base.tags,
-    project: patch.project ?? base.project,
+    // An empty project means "not provided" (the idea factory passes "" when a
+    // draft has none), so it never wipes an existing project.
+    project: patch.project?.trim() ? patch.project : base.project,
     statement: patch.statement ?? base.statement,
     goal: patch.goal ?? base.goal,
     elements: mergeElements(base.elements, patch.elements),

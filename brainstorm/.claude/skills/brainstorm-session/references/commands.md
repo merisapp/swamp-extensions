@@ -1,5 +1,10 @@
 # Commands
 
+These are the brainstorm behavior's own commands. A session creates its idea
+through the idea factory's `committing` stage (see factory-driving.md); use
+these directly for research, prior art, links, standalone reviews of stored
+ideas, and changes to an idea that is already committed.
+
 Every command runs against a data set: prefix with `SWAMP_REPO_DIR=<dir>` or add
 `--repo-dir <dir>`. Always pass `--skip-reports` on writes. Check the exact
 flags with `swamp help behavior run` if a call fails.

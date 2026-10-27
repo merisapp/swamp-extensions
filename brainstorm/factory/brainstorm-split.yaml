@@ -1,0 +1,125 @@
+# Split an idea into sub-ideas: write the parent, then every part, then link each
+# part to the parent. Three jobs in this order because linkIdeas fails for an
+# idea that is not stored yet. The idea factory's `committing-split` stage runs
+# this workflow and its gate checks swamp's own run record for it.
+#
+# This is a TEMPLATE. new-dataset.sh installs it: it creates a workflow with
+# `swamp workflow create brainstorm-split`, keeps that scaffold's `id`, and
+# replaces the rest with this file.
+name: brainstorm-split
+description: >-
+  Write a split idea: the parent (rewritten as the umbrella for a component
+  split), each part, and a part-of or spawned-from link from every part to the
+  parent. Component parts get part-of; offshoots get spawned-from.
+tags:
+  purpose: brainstorm-split
+inputs:
+  type: object
+  required: [kind, parent, parts]
+  properties:
+    kind:
+      type: string
+      enum: [component, offshoot]
+      description: component = parts that together make the whole; offshoot = new ideas that came out of a parent that stays whole.
+    parent:
+      type: object
+      required: [id, title, summary, statement, goal, status]
+      properties:
+        id: {
+          type: string,
+          description: The parent's idea id (its title in lowercase with hyphens).,
+        }
+        title: { type: string }
+        summary: { type: string }
+        statement: { type: string }
+        goal: { type: string }
+        status: { type: string, enum: [seed, exploring, parked, dead, shipped] }
+        elements: { type: object, additionalProperties: { type: string } }
+    parts:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required: [id, title, summary, statement, goal, alignmentState]
+        properties:
+          id: {
+            type: string,
+            description: The part's idea id (its title in lowercase with hyphens).,
+          }
+          title: { type: string }
+          summary: { type: string }
+          statement: { type: string }
+          goal: { type: string }
+          alignmentState: {
+            type: string,
+            enum: [confirmed, unchecked, disputed],
+          }
+          alignmentNote: { type: string }
+          elements: { type: object, additionalProperties: { type: string } }
+jobs:
+  - name: parent
+    description: Write the parent idea first; the parts link to it.
+    dependsOn: []
+    steps:
+      - name: capture-parent
+        description: Create or update the parent (the umbrella for a component split).
+        task:
+          type: model_method
+          modelIdOrName: brainstorm
+          methodName: captureIdea
+          inputs:
+            title: ${{ inputs.parent.title }}
+            summary: ${{ inputs.parent.summary }}
+            statement: ${{ inputs.parent.statement }}
+            goal: ${{ inputs.parent.goal }}
+            status: ${{ inputs.parent.status }}
+            elements: ${{ inputs.parent.?elements.orValue({}) }}
+        dependsOn: []
+  - name: parts
+    description: Write every part. Parts do not depend on each other.
+    dependsOn:
+      - job: parent
+        condition:
+          type: succeeded
+    steps:
+      - name: capture-part-${{ self._index }}
+        description: Create one part.
+        forEach:
+          item: part
+          in: ${{ inputs.parts }}
+        task:
+          type: model_method
+          modelIdOrName: brainstorm
+          methodName: captureIdea
+          inputs:
+            title: ${{ self.part.title }}
+            summary: ${{ self.part.summary }}
+            statement: ${{ self.part.statement }}
+            goal: ${{ self.part.goal }}
+            elements: ${{ self.part.?elements.orValue({}) }}
+            alignment:
+              state: ${{ self.part.alignmentState }}
+              note: ${{ self.part.?alignmentNote.orValue("") }}
+        dependsOn: []
+  - name: links
+    description: Link each part to the parent, now that every idea is stored.
+    dependsOn:
+      - job: parts
+        condition:
+          type: succeeded
+    steps:
+      - name: link-part-${{ self._index }}
+        description: Link one part to the parent.
+        forEach:
+          item: part
+          in: ${{ inputs.parts }}
+        task:
+          type: model_method
+          modelIdOrName: brainstorm
+          methodName: linkIdeas
+          inputs:
+            from: ${{ self.part.id }}
+            to: ${{ inputs.parent.id }}
+            kind: '${{ inputs.kind == "component" ? "part-of" : "spawned-from" }}'
+        dependsOn: []
+version: 1

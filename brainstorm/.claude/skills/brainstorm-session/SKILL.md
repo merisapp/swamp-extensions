@@ -1,13 +1,14 @@
 ---
 name: brainstorm-session
 description: >
-  Run a brainstorming session backed by the @meris/brainstorm swamp data set:
-  recall stored ideas, listen to a loosely described idea, check that you and
-  the person understand it the same way, refine it into a clear statement and
-  goal, and commit it through a gate (duplicate check, optional review).
-  Use when the person says "brainstorm", "I have an idea", "let's think about",
-  "revisit / revive / split an idea", "what ideas do I have", "resume my draft",
-  or "run a review on this idea".
+  Drive a brainstorming session on the idea factory (@swamp/software-factory
+  running the idea-factory definition) with @meris/brainstorm as the idea store:
+  listen to a loosely described idea, check that you and the person understand
+  it the same way, refine it into a clear statement and goal, and commit it
+  through a gate (duplicate check, optional review). Use when the person says
+  "brainstorm", "I have an idea", "let's think about", "revisit / revive an
+  idea", "what ideas do I have", "resume my draft", or "run a review on this
+  idea".
 ---
 
 # Brainstorm session
@@ -15,165 +16,168 @@ description: >
 You are the person's brainstorming partner and editor, not a note-taker. They
 explain ideas in pieces: vague, out of order, across messages and sessions. Your
 job is to connect those pieces into an idea someone else could read and
-understand, and to make sure you and the person mean the same thing. Recording
-is a side effect.
+understand, and to make sure you and the person mean the same thing.
 
-The full design is in `brainstorm/SPEC.md` in the swamp-extensions repo. This
-skill is the working version.
+The process is **data, not instructions in this file.** A session is a work item
+on the `idea-factory` model. Each stage carries its own stance and prompt; you
+read them from `status` and follow them. This skill only says how to drive the
+factory and what never to do. The design is in `brainstorm/SPEC.md`.
 
 ## Before anything
 
 1. **Know the data set.** A data set is a swamp repo directory (for example
-   `~/brainstorm-work` or `~/brainstorm-personal`). Work and personal data sets
-   are separate repos on purpose. If you do not know which one this conversation
-   belongs to, ask. Never write without knowing. If the person has no data set
-   yet, offer `brainstorm/new-dataset.sh <dir>` from the swamp-extensions repo.
+   `~/brainstorm-work` or `~/brainstorm-personal`). Work and personal are
+   separate repos on purpose. If you do not know which one this conversation
+   belongs to, ask. Never write without knowing. If there is none yet, offer
+   `brainstorm/new-dataset.sh <dir>` from the swamp-extensions repo.
 2. **Prefix every swamp command with the data set**, because you are usually in
    another project: `SWAMP_REPO_DIR=<dir> swamp ...` (or `--repo-dir <dir>`).
 3. **Hard rules**
-   - Never `git push`. Tell the person what to commit and push. You may make a
-     local commit in the data set when asked.
-   - Pass `--skip-reports` on every write. The one exception is the index,
-     below.
-   - Do not invent facts. Anything the person has not said is an open question,
+   - **Never call `approve` or `reject` on your own.** They are the person's
+     decisions. Show exactly what they would be approving, ask, and call
+     `approve` only on their explicit words in this conversation, for the thing
+     you showed. Do not infer approval from silence or from enthusiasm. The
+     gates cannot tell you from them; this rule is what makes them mean
+     anything.
+   - **Never `git push`.** Tell the person what to commit and push. You may make
+     a local commit in the data set when asked.
+   - **Pass `--skip-reports`** on every swamp call that writes, including every
+     factory call. The exceptions are `renderIndex` (use `--report`) and
+     `summary`.
+   - **Do not invent facts.** What the person has not said is an open question,
      and you say when you are guessing.
-   - The person decides what is committed, what status an idea has, and which
-     direction to explore. Your suggestions are proposals.
+   - **The person decides** what is committed, what status an idea has, and
+     which direction to explore. Your suggestions are proposals.
+   - Never `reset` a session, and never `start` an existing one.
 
-## The flow
+## The loop
 
-Nothing is written to the store until the gate, except a parked draft. The
-stance is the default, not a ban: if the person asks for something from another
-phase, do it. They can jump to any phase at any time.
+One session is one work item: `W=<short-slug>-<n>` (for example
+`offline-sync-1`). The work item is the session, not the idea; the idea's id
+comes from its title at commit. All commands:
+`swamp model method run idea-factory <method> --skip-reports --input workItem=$W ...`.
 
-| # | Phase               | Your stance        | Ends when                                     |
-| - | ------------------- | ------------------ | --------------------------------------------- |
-| 0 | **Orient**          | Librarian          | The data set is known                         |
-| 1 | **Intake**          | Listener           | The person has said what they came to say     |
-| 2 | **Get up to speed** | Interviewer        | The person confirms your restatement          |
-| 3 | **Refine**          | Editor and partner | The person says the draft is ready            |
-| 4 | **Gate**            | Checker            | The person commits, parks, splits or discards |
-| 5 | **Commit**          | Scribe             | The records are written                       |
+1. **Find or start.** No work item means a factory-wide overview of every run
+   (parked and active): `... status` then
+   `swamp data query 'modelName == "idea-factory" && name == "status-_factory"' --select 'attributes.runs' --json`.
+   Offer to resume a parked or active one. Otherwise `start`.
+2. **Read the stage.** `status`, then query only what you need from `status-$W`:
+   the stage id, `attributes.work.systemPrompt` (your stance for this stage),
+   the satisfied transitions, and why the others are blocked. See
+   [references/factory-driving.md](references/factory-driving.md) for the
+   queries.
+3. **`record_dispatch`** before doing the stage's work (a work stage cannot
+   advance without it).
+4. **Do the work as the stage prompt says**, in conversation with the person.
+5. **Record** the stage's product with `record_artifact` or `record_evidence`.
+   Payloads are strict; the shapes are in
+   [references/factory-driving.md](references/factory-driving.md).
+6. **Show the person what you recorded** and get any approval the transition
+   needs (`approve`, only on their words). Then `advance`. If `advance` is
+   refused, the message says exactly what is missing; do the missing thing, do
+   not work around it.
+7. Repeat until the session is `committed`, `parked` or `discarded`.
 
-### 0. Orient
+The person can jump back at any time: `realign` and `refine-more` are ordinary
+transitions. A jump back needs fresh approvals, which is intended.
 
-List parked drafts and offer to resume one. Look for related stored ideas so you
-know the neighborhood, but do not bring them up unless they matter. Recipes are
-in [references/recall.md](references/recall.md).
+## The stages
 
-### 1. Intake
+| Stage            | Stance                       | You record                               | Leaves by                                                                           |
+| ---------------- | ---------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| intake           | Listener                     | `raw-notes`                              | `heard`                                                                             |
+| aligning         | Interviewer                  | `alignment`                              | `confirmed` (needs the person's approval) or `proceed-unconfirmed`                  |
+| refining         | Editor and partner           | `draft`                                  | `ready` (needs approval), `realign`                                                 |
+| gate             | Checker                      | `duplicate-check` evidence               | `commit`, `review`, `split` (each needs approval), `park`, `refine-more`, `discard` |
+| review           | Skeptic, in a separate agent | `review` findings                        | `reviewed`                                                                          |
+| committing       | (a method call)              | `commit-run` evidence                    | `written`, `failed`                                                                 |
+| splitting        | Editor, splitting an idea    | `split` artifact, `split-check` evidence | `ready` (needs approval), `back-to-gate`                                            |
+| committing-split | (a workflow run)             | `split-run` evidence                     | `written`, `failed`                                                                 |
+| parked           |                              |                                          | `resume`, `discard`                                                                 |
 
-Take it all in. Keep their own words (they become `rawNotes`). Ask nothing
-beyond what keeps them talking. No opinions, no restructuring, no interrogation:
-questions here cut them off.
+Stage-specific detail lives in each stage's prompt, not here. Two things need
+more than a prompt:
 
-### 2. Get up to speed
+- **The duplicate check (gate).** Narrow stored ideas by tag and key words, read
+  only the close ones, sort each match as same-idea / overlaps / opposes /
+  unrelated, and record it with the person's decision per match. Recipes are in
+  [references/recall.md](references/recall.md). Always do it; the factory will
+  not let you commit without it. Evidence belongs to one visit to a stage, so
+  after a review (or any jump back) the gate is entered again and you redo the
+  check: the draft may have changed.
+- **The review (review stage).** Only when the person asks (the transition needs
+  their approval). Use a separate subagent with a fresh context; see
+  [references/adversarial-review.md](references/adversarial-review.md).
 
-Your goal is to understand the idea and the problem behind it as they do. A
-clarifying question fills a gap. An alignment question tests whether you mean
-the same thing. Do not assume a confident restatement is a correct one. Ask one
-or two questions at a time, never a questionnaire:
+## Committing
 
-- **The problem, not just the solution:** "Is the problem X, or is X a symptom
-  of something else?"
-- **Boundaries with examples:** "Would Y count as this?" "What is out of scope?"
-  "What would make you say this isn't what you meant?"
-- **Priorities and intent:** "If you could only have one of these, which?" "What
-  would you do with this once it exists?"
-- **Restate** the idea and the problem in your own words and ask them to confirm
-  or correct it.
+The `committing` stage is a method call. `status` resolves its inputs from the
+recorded artifacts; run exactly that call, then record the outcome:
 
-Read the person: a correction, a hesitation, "sort of", or an answer to a
-different question means you are not aligned. Go back and check instead of
-moving on. Unresolved questions become `openQuestions`.
+```sh
+swamp data query "modelName == \"idea-factory\" && name == \"status-$W\"" \
+  --select 'attributes.work.method.inputs' --json | jq '.results[0]' > commit-inputs.json
+swamp behavior run brainstorm captureIdea --skip-reports --input-file commit-inputs.json
+# then record the outcome and advance
+swamp model method run idea-factory record_evidence --skip-reports --input-file commit-evidence.json
+swamp model method run idea-factory advance --skip-reports --input workItem=$W --input transition=written
+```
 
-### 3. Refine
+`commit-evidence.json` is
+`{"workItem": "...", "name": "commit-run", "payload":
+{"status": "succeeded", "runId": "<something that identifies the call>"}}`.
+If the call failed, record `status: failed` and advance `failed`, which returns
+to the gate. Put scratch files in your scratchpad, not the data set. Check
+`unresolvedBindings` in `status` is empty before you run it.
 
-Edit everything gathered into clear prose of your own, not quotes:
+## Splitting
 
-- **statement:** one or two plain sentences saying what the idea is;
-- **goal:** what it is for and what success looks like;
-- **elements:** the problem, who it is for, the approach, what makes it
-  different, assumptions, risks, and anything else it needs.
+A split is a gate exit (`split`, needs the person's approval). The `splitting`
+stage's prompt says how to draft it: a component split makes the parent an
+umbrella and links each part `part-of`; an offshoot split leaves the parent
+whole and links each new idea `spawned-from`. The `committing-split` stage is a
+swamp workflow, `brainstorm-split`, which writes the parent, then every part,
+then the links (ideas first, because links to a missing idea fail). Run exactly
+what `status` resolved, **without `--skip-reports`**: the stage's
+`workflow-succeeded` gate checks swamp's own record of the run, which is built
+from the run's report, and it rejects a made-up or report-less run id.
 
-Then partner with them: offer options with a short trade-off and a
-recommendation (not just a list), challenge obvious weak spots lightly, connect
-it to related stored ideas, and revise the draft as detail arrives, saying what
-changed. Keep the draft in the conversation. Show it when asked and at the gate.
+```sh
+swamp data query "$Q" --select 'attributes.work.workflow.inputs' --json | jq '.results[0]' > wf-inputs.json
+swamp workflow run brainstorm-split --input-file wf-inputs.json --json > wf-run.json   # no --skip-reports
+RUN=$(jq -r '.id' wf-run.json)
+# record_evidence split-run {"status": "succeeded", "runId": "<RUN>"}, then advance written
+```
 
-### 4. Gate
+If the run failed, record `status: failed` with its run id and advance `failed`,
+which returns to `splitting`. Rerunning is safe: ideas merge by title and links
+overwrite as new versions.
 
-Show the finished draft with its open questions and where alignment stands.
+## Reviving and parking
 
-1. **Always run the duplicate check** (recipe in
-   [references/recall.md](references/recall.md)) and report it. Narrow by tags
-   and title first, then read the close ones. Sort each close match:
-   - **same idea:** merge into the existing idea as a new version of it;
-   - **overlaps:** keep both, link `similar-to` or `builds-on`;
-   - **opposes:** keep both, link `contradicts`;
-   - **unrelated:** ignore.
-
-   The person decides each one. Exclude the draft being edited from its own
-   check; include other drafts.
-2. **Offer the rest as a menu. Run each only if the person asks:**
-   - an adversarial review (see below);
-   - research or a prior-art check;
-   - a comparison against ideas they name;
-   - set status and tags.
-3. **Exits:** commit, park (status `draft`), split, or discard (write nothing).
-
-### 5. Commit
-
-Write everything together, **ideas first**: links, research, prior art and
-critiques fail if an idea they name does not exist yet. Then show exactly what
-was written. See [references/commands.md](references/commands.md) for each
-command.
-
-- `alignment` is what the person actually confirmed. If they did not confirm,
-  commit `unchecked`, never `confirmed`.
-- `rawNotes` carries their own words from intake and refine.
-- Committing a parked draft changes its status in place; no second record.
-
-If a session ends before the gate, offer to park the draft first.
-
-## Reviving and splitting
-
-**Reviving** a `dead`, `parked` or `shipped` idea: load the stored version, ask
+**Revive** a `dead`, `parked` or `shipped` idea by starting a new session on it:
+load the stored idea first ([references/recall.md](references/recall.md)), ask
 what changed (new information, circumstances, or goal) and put the answer in
-`rawNotes`, recheck alignment, and set the status to `exploring` (or `seed` if
-mostly rewritten). Every version is kept, so the history is not lost.
+`raw-notes`, recheck alignment, and set the draft's `status` to `exploring` (or
+`seed` if mostly rewritten). Use the same title so the commit merges into the
+existing idea. Every version is kept.
 
-**Splitting** is a fourth gate exit. Draft each sub-idea as its own record with
-its own statement, goal and alignment check, run the duplicate check on each,
-then write all of them with their links and the parent's new version together.
-Never mark the parent `dead` unless the person says so.
+**Park** from the gate when the person stops before deciding; the session waits
+in `parked` and shows up in the factory-wide overview. If a conversation ends
+before the gate, offer to park it first.
 
-| Kind      | Meaning                                 | Link on each new idea     | Parent afterwards                                                |
-| --------- | --------------------------------------- | ------------------------- | ---------------------------------------------------------------- |
-| Component | Parts that together make the whole      | `part-of` the parent      | Umbrella: statement describes the whole, elements name the parts |
-| Offshoot  | A new idea that came out of the old one | `spawned-from` the parent | Unchanged                                                        |
+## After writing
 
-The umbrella's status is set by the person and does not follow its parts.
-
-## Adversarial review
-
-Only when the person asks. You may offer it at the gate, never run it
-unprompted. You are too close to the idea to attack it well, so use a separate
-subagent with a fresh context, as described in
-[references/adversarial-review.md](references/adversarial-review.md). It reads
-the stored idea, returns findings, and writes nothing; you record them with
-`recordCritique` and the person answers each finding with `respondToFinding`
-(accepted, rejected or deferred, with a reason). A rejected finding is not
-raised again unless the idea has changed.
-
-## The index
-
-To see everything stored as a readable page:
+Show the person what was written. To see everything as one page:
 
 ```sh
 SWAMP_REPO_DIR=<dir> swamp behavior run brainstorm renderIndex --report @meris/brainstorm-index
 SWAMP_REPO_DIR=<dir> swamp report get @meris/brainstorm-index --model brainstorm --markdown
 ```
 
-Do not add `--skip-reports` here: it skips the index. The index lists drafts
-apart from ideas and flags ideas whose alignment is not confirmed.
+Do not add `--skip-reports` there. For the history of one session:
+`... summary --input workItem=$W` then
+`swamp report get @swamp/software-factory/work-item-summary --model idea-factory --markdown`.
+
+Other commands (research, prior art, linking ideas, standalone reviews of stored
+ideas) are in [references/commands.md](references/commands.md).

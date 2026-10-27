@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
 # Create a new brainstorm data set: a swamp repo with a git-tracked store.
 #
-#   new-dataset.sh <dir> [--source <path-to-brainstorm-extension>]
+#   new-dataset.sh <dir> [--source <path-to-brainstorm-extension>] [--no-factory]
 #
 # One directory is one data set (for example ~/brainstorm-work). Everything the
 # spec asks for is done here: a relative datastore path, the gitignored
-# .catalog-writers marker, and the index report wired to renderIndex only. The
-# script commits and pushes nothing.
+# .catalog-writers marker, the index report wired to renderIndex only, and the
+# idea factory (the session process, from factory/idea-factory.yaml) installed on
+# @swamp/software-factory. --no-factory skips the last one. The script commits
+# and pushes nothing.
 set -euo pipefail
 
 usage() {
-  echo "usage: $(basename "$0") <dir> [--source <path-to-brainstorm-extension>]" >&2
+  echo "usage: $(basename "$0") <dir> [--source <path-to-brainstorm-extension>] [--no-factory]" >&2
   exit 2
 }
 
 source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 target=""
+with_factory=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --source) [ $# -ge 2 ] || usage; source_dir="$2"; shift 2 ;;
+    --no-factory) with_factory=0; shift ;;
     -h | --help) usage ;;
     -*) usage ;;
     *) [ -z "$target" ] || usage; target="$1"; shift ;;
@@ -64,6 +68,43 @@ reports:
       methods: ["renderIndex"]
 EOF
 
+if [ "$with_factory" = 1 ]; then
+  template="$source_dir/factory/idea-factory.yaml"
+  [ -f "$template" ] || {
+    echo "error: no factory/idea-factory.yaml in $source_dir (use --no-factory)" >&2
+    exit 1
+  }
+  swamp extension pull @swamp/software-factory --yes > /dev/null
+  swamp model create @swamp/software-factory idea-factory > /dev/null
+  model_file="models/@swamp/software-factory/idea-factory.yaml"
+  [ -f "$model_file" ] || { echo "error: $model_file not found" >&2; exit 1; }
+  # Keep the model's identity header (type, id, name, ...); the template supplies
+  # the rest.
+  header="$(grep -vE '^(globalArguments|methods):' "$model_file")"
+  { printf '%s\n\n' "$header"; cat "$template"; } > "$model_file"
+  swamp model method run idea-factory validate > /dev/null || {
+    echo "error: the idea factory definition did not validate in $target" >&2
+    exit 1
+  }
+
+  # The split stage runs a workflow. Start from the scaffold so the workflow
+  # keeps the id swamp gave it.
+  wf_template="$source_dir/factory/brainstorm-split.yaml"
+  [ -f "$wf_template" ] || {
+    echo "error: no factory/brainstorm-split.yaml in $source_dir" >&2
+    exit 1
+  }
+  swamp workflow create brainstorm-split --json > /dev/null
+  wf_file="workflows/workflow-brainstorm-split.yaml"
+  [ -f "$wf_file" ] || { echo "error: $wf_file not found" >&2; exit 1; }
+  wf_id="$(grep -m1 '^id:' "$wf_file")"
+  { printf '%s\n' "$wf_id"; cat "$wf_template"; } > "$wf_file"
+  swamp workflow validate brainstorm-split > /dev/null || {
+    echo "error: the brainstorm-split workflow did not validate in $target" >&2
+    exit 1
+  }
+fi
+
 swamp doctor extensions --json | grep -q '"overallStatus": "pass"' || {
   echo "error: swamp doctor extensions did not pass in $target" >&2
   exit 1
@@ -74,9 +115,12 @@ Created brainstorm data set: $target
 
 Use it from any project:
   export SWAMP_REPO_DIR="$target"
-  swamp behavior run brainstorm captureIdea --skip-reports --input title="..."
+  swamp model method run idea-factory start --skip-reports --input workItem=<session>
   swamp behavior run brainstorm renderIndex --report @meris/brainstorm-index
   swamp report get @meris/brainstorm-index --model brainstorm --markdown
+The brainstorm-session skill drives a session; see it for the full loop.
+Consider a Claude Code permission rule that asks before any 'approve' call, so
+that only you can approve a gate.
 
 Before you commit, check that nothing under vaults/ holds key material
 (swamp keeps the key under .swamp/, which is gitignored). Then, yourself:

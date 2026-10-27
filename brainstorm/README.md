@@ -63,6 +63,22 @@ swamp report get @meris/brainstorm-index --model brainstorm --markdown
 
 Do not add `--skip-reports` to `renderIndex`; it skips the index.
 
+## The idea factory
+
+A brainstorming session is a work item on the idea factory: the
+`@swamp/software-factory` engine running `factory/idea-factory.yaml`. The
+definition holds the stages (intake, aligning, refining, gate, review, split,
+commit, parked), the gates between them, and the agent's prompt for each phase.
+The factory refuses to advance a stage that has not run, a missing record, a
+missing duplicate check, or a missing approval from you. Ideas are written to
+the brainstorm store at commit.
+
+The factory is a separate extension (AGPL-3.0-or-later) that `new-dataset.sh`
+pulls into the data set; this extension does not depend on it in code. Skip it
+with `--no-factory` to use the brainstorm behavior alone. The definition and the
+`brainstorm-split` workflow are templates in `factory/`, installed by the script
+and not part of the published package.
+
 ## Agent skill and data sets
 
 The `brainstorm-session` skill (`.claude/skills/brainstorm-session/`) tells an

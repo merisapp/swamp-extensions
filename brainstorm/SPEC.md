@@ -1,11 +1,13 @@
 # @meris/brainstorm — spec
 
 Status: draft. Built and tested: the data model and methods (`brainstorm.ts`),
-the index report (`brainstorm_index_report.ts`), the agent skill
+the index report (`brainstorm_index_report.ts`), the idea factory
+(`factory/idea-factory.yaml`, the session process on `@swamp/software-factory`),
+the split workflow (`factory/brainstorm-split.yaml`), the agent skill
 (`.claude/skills/brainstorm-session/`) and the data set script
-(`new-dataset.sh`). The session flow and the adversarial review procedure are
-design that the skill carries out; code does not enforce them. The research
-workflow is **(planned)**.
+(`new-dataset.sh`). The factory enforces the session flow's gates; the stage
+prompts carry the agent's stance in each phase; the skill is the thin driver.
+The research workflow is **(planned)**.
 
 ## Purpose
 
@@ -23,9 +25,22 @@ Swamp data is the only store. There is no note app, no sync and no write-back.
 - **One central repo per data set** (for example work and personal). Separate
   repos, separate remotes, no cross-set links. Chosen so confidential or
   employer-owned ideas never share a repo with personal ones.
-- **Bouncing is a conversation, not a workflow.** Swamp supplies capture, link,
-  research and recall; the session protocol below tells the agent how to use
-  them.
+- **The session is a state machine in data, not a workflow and not prose.** The
+  `@swamp/software-factory` engine has no lifecycle of its own (its source has
+  no software-specific logic); the idea factory definition supplies the stages,
+  gates and agent prompts. This is how swamp's own interactive flows are built:
+  the phase lives in data, gates are checked before a transition, and a skill
+  drives the conversation. Swamp workflows are used where the work is
+  deterministic and repeatable: the split (`brainstorm-split`) and, later,
+  research.
+- **The factory holds the process, brainstorm holds the ideas.** A factory work
+  item is one session. The idea's content is written to the brainstorm store
+  only at commit, through `captureIdea` (or the split workflow).
+- **Gates make the process consistent; they do not make it trustworthy.** An
+  approval is a record anyone can write, including the agent. The skill forbids
+  the agent from approving on its own, and a permission rule that asks before
+  any `approve` call is the one real lever. Method outcomes are self-reported;
+  only a `workflow-succeeded` gate is checked against swamp's own run records.
 - **Research is a normal step, recommended often, never forced.**
 - **Recall is `swamp data query`, not a method.**
 
@@ -176,6 +191,11 @@ make a local git commit in the central repo when asked, and never pushes.
 
 ### Drafts
 
+In the factory flow a parked session waits in the `parked` stage, and the
+factory-wide `status` overview lists it; nothing is written to the idea store
+until a commit. The `draft` status on an idea remains in the schema for records
+written without the factory, which is the older way described below.
+
 A parked draft is an `idea` with `status: draft`. It exists so unfinished
 thinking survives the end of a session.
 
@@ -211,8 +231,11 @@ recoverable. In addition to the normal flow:
 
 ### Splitting
 
-A split is a fourth exit at the gate, next to commit, park and discard. There
-are two kinds, and they use different links:
+A split is a gate exit (`split`, needing the person's approval), next to commit,
+park and discard. It runs through the `splitting` stage and the
+`brainstorm-split` workflow, which writes the parent, then every part, then the
+links, and is verified against swamp's run record. There are two kinds, and they
+use different links:
 
 | Kind          | Meaning                                                     | Link on each new idea     | Parent afterwards                                                                        |
 | ------------- | ----------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
