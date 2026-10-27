@@ -1,9 +1,11 @@
 # @meris/brainstorm — spec
 
-Status: draft. The data model and methods match `brainstorm.ts` (version
-`2026.10.27.1`). The session flow, adversarial review procedure, session
-protocol, report and workflow are **(planned)**: they describe how an agent uses
-the extension and are not enforced by code.
+Status: draft. Built and tested: the data model and methods (`brainstorm.ts`),
+the index report (`brainstorm_index_report.ts`), the agent skill
+(`.claude/skills/brainstorm-session/`) and the data set script
+(`new-dataset.sh`). The session flow and the adversarial review procedure are
+design that the skill carries out; code does not enforce them. The research
+workflow is **(planned)**.
 
 ## Purpose
 
@@ -27,7 +29,7 @@ Swamp data is the only store. There is no note app, no sync and no write-back.
 - **Research is a normal step, recommended often, never forced.**
 - **Recall is `swamp data query`, not a method.**
 
-## Session flow (planned)
+## Session flow
 
 The agent is a brainstorming partner and an editor, not a note-taker. People
 explain ideas in pieces: vague, out of order, across several messages and
@@ -231,7 +233,7 @@ How a split works:
 The umbrella parent's status is set by the person. It does not follow the status
 of its parts. Automatic rollup is a possible later addition.
 
-## Adversarial review (planned)
+## Adversarial review
 
 A separate step, run only when the person asks. The agent may offer it (for
 example at the gate) but never runs it unprompted. The conversation partner is
@@ -250,8 +252,8 @@ with them and has a pull to agree. So the review is done by a separate agent.
   agents tend to agree with each other too early. The reviewer uses the same
   model as the partner, to keep things simple. A different model is a possible
   later experiment; I found no evidence either way.
-- **Read-only.** It cannot change the idea. It writes a critique record and
-  nothing else.
+- **Read-only.** It changes nothing. It returns its findings and the session
+  agent records them with `recordCritique`.
 
 ### Method
 
@@ -378,6 +380,8 @@ Built (see the README for usage):
 - `recordResearch`, `recordPriorArt` — fail if an idea they name does not exist.
 - `recordCritique` — store a review of an existing idea.
 - `respondToFinding` — record the person's response to one finding.
+- `renderIndex` — writes nothing; exists so the index report has a method to run
+  after (see Report).
 
 Planned:
 
@@ -388,68 +392,76 @@ Planned:
 
 ## Data set layout and bootstrap
 
-One directory per data set, for example `~/brainstorm-work`. Setup, once per
-data set:
+One directory per data set, for example `~/brainstorm-work`. `new-dataset.sh`
+does the whole setup and commits and pushes nothing:
 
 ```sh
-mkdir ~/brainstorm-work && cd ~/brainstorm-work
-git init -b main
-swamp repo init
-swamp extension source add /path/to/swamp-extensions/brainstorm
-swamp behavior create @meris/brainstorm brainstorm
-swamp datastore setup filesystem --path ./store --directories data
+brainstorm/new-dataset.sh ~/brainstorm-work
 ```
 
-Then:
+It runs `git init`, `swamp repo init`, `swamp extension source add`, creates the
+`brainstorm` behavior and sets up the datastore, and then fixes what setup gets
+wrong or leaves out:
 
-1. Edit `.swamp.yaml` so `datastore.path` is `./store`. Setup writes an absolute
-   path; without this edit a clone reads and writes the original clone's store.
-2. Add `store/.catalog-writers/` to `.gitignore`. It is a per-machine marker.
-3. Check that nothing under `vaults/` holds key material before committing.
-4. Commit. Add the remote and push yourself.
+1. Setup writes an absolute `datastore.path` into `.swamp.yaml`; without a fix a
+   clone reads and writes the original clone's store. The script makes it
+   `./store`.
+2. It adds `store/.catalog-writers/` to `.gitignore`. It is a per-machine
+   marker.
+3. It wires the index report to the `renderIndex` method only, in the behavior
+   definition (`reports.require` with `methods: ["renderIndex"]`), so ordinary
+   writes stay quiet.
+4. It checks `swamp doctor extensions` passes.
+
+Check that nothing under `vaults/` holds key material before committing (swamp
+keeps the key under `.swamp/`, which is gitignored). Commit, add the remote and
+push yourself.
 
 Other projects reach a data set with `SWAMP_REPO_DIR=~/brainstorm-work` or
 `--repo-dir`. Only the central repo needs the extension source. Pass
-`--skip-reports` on every call to keep report and log items out of the store.
+`--skip-reports` on every write to keep report and log items out of the store.
 
 If the central repo is restored from a clone, delete `.swamp/data/_catalog.db*`
 once. The catalog is per-clone and is rebuilt from disk on the next query.
 
-## Session protocol (planned)
+## Session protocol
 
-Text for a CLAUDE.md section or skill in projects that use a data set:
+The working version is the `brainstorm-session` skill
+(`.claude/skills/brainstorm-session/`), which a project loads when the person
+starts brainstorming. It carries out the session flow above and adds the
+commands and recall queries that were tested against a real data set. The spec
+describes the design; the skill is the instruction the agent follows, so the two
+should not be allowed to drift. Its hard rules:
 
-1. **Confirm the data set first** (work or personal) and set `SWAMP_REPO_DIR` to
-   it. Never write without knowing which set a conversation belongs to.
-2. **Orient.** List parked drafts and offer to resume one. Query the store for
-   related ideas by tag and title:
-   `swamp data query 'behavior("brainstorm") && tags.specName == "idea"'`.
-3. **Follow the session flow:** intake, get up to speed, refine, gate, commit.
-   Hold the draft in the conversation. Do not write to the store before the
-   gate, except to park a draft.
-4. **Edit, don't transcribe.** Turn what the person said into a statement, a
-   goal and the other elements (see Refine), and keep their own words as
-   `rawNotes`.
-5. **Check alignment before the gate ends.** Set `alignment` to what the person
-   actually confirmed. If they have not confirmed, commit it as `unchecked`,
-   never as `confirmed`.
-6. **At the gate, always run the duplicate check**, then offer the menu. Run an
-   adversarial review, research or a comparison against named ideas only when
-   the person asks.
-7. **Commit writes everything together:** the idea, its links (`linkIdeas`),
-   prior art (`recordPriorArt`) and any critique. Show what was written. A split
-   writes all sub-ideas, their `part-of` or `spawned-from` links and the
-   parent's new version in the same step. When reviving a `dead`, `parked` or
-   `shipped` idea, ask what changed and recheck alignment first.
-8. **Park before closing** if the session ends before the gate.
-9. **Always pass `--skip-reports`.**
-10. Never `git push`. Tell the person what to commit and push.
+- Know the data set (work or personal) before writing anything.
+- Hold the draft in the conversation until the gate, except to park a draft.
+- Always run the duplicate check at the gate. Run reviews, research and
+  comparisons only when the person asks.
+- Write ideas before anything that names them.
+- Pass `--skip-reports` on every write.
+- Never `git push`; tell the person what to commit and push.
 
-## Report (planned)
+## Report
 
-A report extension (CLAUDE.md rule 8) that renders the store as an index and
-map: ideas grouped by status, per-idea pages with research and prior art, and
-the idea-link graph. Markdown first, HTML later.
+`@meris/brainstorm-index` (`brainstorm_index_report.ts`) renders the store as
+one page: a needs-attention list (parked drafts, ideas whose alignment is not
+confirmed, seeds with no research, unreadable records), drafts listed apart from
+ideas, ideas by status, a Mermaid link graph, and per-idea details including
+parts, research, prior art and reviews with the person's responses. Unconfirmed
+ideas are marked as the agent's guess.
+
+Swamp can only run a report after a method, so the extension has a method that
+writes nothing, `renderIndex`, and the data set wires the report to that method
+alone:
+
+```sh
+swamp behavior run brainstorm renderIndex --report @meris/brainstorm-index
+swamp report get @meris/brainstorm-index --model brainstorm --markdown
+```
+
+Do not pass `--skip-reports` to `renderIndex`: it skips the index. The report is
+stored as swamp data (30 days, five versions), so it shows up in git history
+when the store is committed. Markdown only for now; HTML later.
 
 ## Workflow (planned)
 
@@ -475,6 +487,12 @@ Known gaps:
 
 - Two writers editing the same idea conflict in git, and conflict markers make
   swamp fail to parse the data. This is why the store has a single writer.
+- `new-dataset.sh` is not part of the published package: the registry allows
+  only `.ts`, `.json`, `.md`, `.yaml`, `.yml` and `.txt` as additional files, so
+  it is used from a checkout of this repo.
+- The skill is listed in the manifest and packaged on push. Whether a local
+  `extension source add` also installs it into a project is not verified; a
+  project can copy `.claude/skills/brainstorm-session/` until it is.
 - A record with an older shape is read as stored. Nothing migrates the first
   versions of the schema, so only the optional-fields rule keeps them valid.
 
@@ -483,9 +501,9 @@ Known gaps:
 - Is a private source host for the collective needed, or does the public repo
   stay as the extension's home? Data sets are always private; only the extension
   is public.
-- What does the first report page look like, and where is it published?
 - How should the duplicate check scale once the store holds hundreds of ideas?
-  Narrowing by tags and title and then reading the close matches is the starting
-  point; it may need a method that returns candidates.
+  It now narrows by tags and key words with `swamp data query` and reads only
+  the close matches, which needs no method. Revisit if that stops finding
+  duplicates.
 - Can a method hold a draft in the session, or does the agent keep it only in
   the conversation? Current plan: the conversation, plus a parked `draft`.

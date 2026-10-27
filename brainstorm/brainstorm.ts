@@ -1,4 +1,8 @@
-import { z } from "zod";
+// Inline, pinned specifier on purpose: swamp's report bundler does not read
+// deno.json, so a bare "zod" breaks the index report's rebuild (it then falls
+// back to a stale cached bundle without failing).
+// deno-lint-ignore no-import-prefix
+import { z } from "npm:zod@4.3.6";
 
 const IdeaStatus = z.enum([
   "draft",
@@ -58,7 +62,8 @@ export const LinkSchema = z.object({
   createdAt: z.string(),
 });
 
-const ResearchSchema = z.object({
+/** Research notes for one idea. */
+export const ResearchSchema = z.object({
   ideaId: z.string(),
   query: z.string(),
   sources: z.array(z.string()),
@@ -66,7 +71,8 @@ const ResearchSchema = z.object({
   date: z.string(),
 });
 
-const PriorArtSchema = z.object({
+/** A prior-art entry shared across ideas. */
+export const PriorArtSchema = z.object({
   name: z.string(),
   url: z.string().optional(),
   overlap: z.string(),
@@ -444,6 +450,13 @@ export const behavior = {
         );
         return { dataHandles: [handle] };
       },
+    },
+    renderIndex: {
+      description:
+        "Write nothing. Exists so the @meris/brainstorm-index report has a method to run after (swamp has no way to run a report on its own).",
+      arguments: z.object({}),
+      execute: (_args: Record<string, never>, _context: Ctx) =>
+        Promise.resolve({ dataHandles: [] }),
     },
     respondToFinding: {
       description:

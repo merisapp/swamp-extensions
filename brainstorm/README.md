@@ -45,8 +45,40 @@ swamp behavior run brainstorm updateIdea --input-file update.json
 An idea's `status` can be `draft`, `seed`, `exploring`, `parked`, `dead` or
 `shipped`. Methods that name an idea fail if it does not exist.
 
+- `renderIndex` writes nothing. It exists so the index report has a method to
+  run after.
+
 Recall is done with `swamp data query`, not a method. See [SPEC.md](SPEC.md) for
 how an agent is meant to use these during a session.
+
+## Index report
+
+`@meris/brainstorm-index` renders everything stored as one page: what needs
+attention, drafts, ideas by status, a link graph and per-idea details.
+
+```sh
+swamp behavior run brainstorm renderIndex --report @meris/brainstorm-index
+swamp report get @meris/brainstorm-index --model brainstorm --markdown
+```
+
+Do not add `--skip-reports` to `renderIndex`; it skips the index.
+
+## Agent skill and data sets
+
+The `brainstorm-session` skill (`.claude/skills/brainstorm-session/`) tells an
+agent how to run a session: orient, listen, check it understands the idea,
+refine it, and commit it through a gate with a duplicate check and an optional
+adversarial review. See [SPEC.md](SPEC.md) for the design.
+
+A data set is a swamp repo with a git-tracked store. Create one with
+`new-dataset.sh` from a checkout of this repo (it commits and pushes nothing):
+
+```sh
+brainstorm/new-dataset.sh ~/brainstorm-work
+export SWAMP_REPO_DIR=~/brainstorm-work   # from any project
+```
+
+Keep work and personal ideas in separate data sets.
 
 ## License
 

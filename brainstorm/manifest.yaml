@@ -11,6 +11,10 @@ paths:
 
 behaviors:
   - brainstorm.ts
+reports:
+  - brainstorm_index_report.ts
+skills:
+  - brainstorm-session
 additionalFiles:
   - README.md
   - LICENSE
