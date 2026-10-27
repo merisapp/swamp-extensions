@@ -14,6 +14,7 @@ behaviors:
 additionalFiles:
   - README.md
   - LICENSE
+  - SPEC.md
 labels:
   - brainstorm
   - notes
