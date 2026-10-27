@@ -1,0 +1,19 @@
+manifestVersion: 1
+name: "@meris/brainstorm"
+version: "2026.10.26.1"
+description: "Long-term brainstorming memory: capture ideas, link them, and record research and prior art as versioned swamp data."
+
+license: Apache-2.0
+repository: https://github.com/merisapp/swamp-extensions
+
+paths:
+  base: manifest
+
+behaviors:
+  - brainstorm.ts
+additionalFiles:
+  - README.md
+  - LICENSE
+labels:
+  - brainstorm
+  - notes

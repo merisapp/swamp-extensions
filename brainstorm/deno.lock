@@ -1,0 +1,63 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1.0.13": "1.0.13",
+    "jsr:@std/assert@1.0.19": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "jsr:@std/internal@^1.0.14": "1.0.14",
+    "jsr:@std/internal@^1.0.6": "1.0.14",
+    "jsr:@std/path@^1.1.4": "1.1.6",
+    "jsr:@swamp-club/swamp-testing@0.20261013.52": "0.20261013.52",
+    "npm:@marcbachmann/cel-js@7.6.1": "7.6.1",
+    "npm:zod@4.3.6": "4.3.6",
+    "npm:zod@^4.3.6": "4.3.6"
+  },
+  "jsr": {
+    "@std/assert@1.0.13": {
+      "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.6"
+      ]
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.12"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/path@1.1.6": {
+      "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.14"
+      ]
+    },
+    "@swamp-club/swamp-testing@0.20261013.52": {
+      "integrity": "54c441f98f5da2272a9aeb1cbf1e7cbdc77e2e6de89dcbc97d08eda7f5e8fb27",
+      "dependencies": [
+        "jsr:@std/assert@1.0.19",
+        "jsr:@std/path",
+        "npm:@marcbachmann/cel-js",
+        "npm:zod@^4.3.6"
+      ]
+    }
+  },
+  "npm": {
+    "@marcbachmann/cel-js@7.6.1": {
+      "integrity": "sha512-YyY8yiDU07ByKb2rJUoNgMAkYeeDvkdrONBREV2MP9siAW7yNft0KfbIoonWTIMY0fGtv8og0EhzKx3Xsi1Nmg==",
+      "bin": true
+    },
+    "zod@4.3.6": {
+      "integrity": "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1.0.13",
+      "jsr:@swamp-club/swamp-testing@0.20261013.52",
+      "npm:zod@4.3.6"
+    ]
+  }
+}
