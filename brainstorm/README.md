@@ -20,14 +20,33 @@ swamp behavior run brainstorm linkIdeas --input from=offline-sync --input to=cac
 swamp data query 'behavior("brainstorm") && tags.specName == "idea"'
 ```
 
+Structured arguments (lists, objects) go in a file:
+
+```sh
+swamp behavior run brainstorm updateIdea --input-file update.json
+```
+
 ## Methods
 
-- `captureIdea` creates or updates an idea (id is the slugified title).
-- `linkIdeas` links two ideas: spawned-from, similar-to, contradicts, builds-on.
+- `captureIdea` creates an idea (id is the slugified title), or updates it if
+  the title already exists. Only the fields you pass change.
+- `updateIdea` changes fields of an existing idea by id: status, summary, tags,
+  `statement`, `goal`, `elements`, `alignment`, `openQuestions`, `options`.
+  Lists are replaced, `elements` merge by key (an empty value removes a key),
+  and `rawNotes` are appended.
+- `linkIdeas` links two existing ideas: spawned-from, part-of, similar-to,
+  contradicts, builds-on.
 - `recordResearch` stores a research summary and sources for an idea.
 - `recordPriorArt` stores a prior-art entry shared across ideas.
+- `recordCritique` stores an adversarial review of an idea (at most seven
+  findings, stored most severe first).
+- `respondToFinding` records your response to one finding of a critique.
 
-Recall is done with `swamp data query`, not a method.
+An idea's `status` can be `draft`, `seed`, `exploring`, `parked`, `dead` or
+`shipped`. Methods that name an idea fail if it does not exist.
+
+Recall is done with `swamp data query`, not a method. See [SPEC.md](SPEC.md) for
+how an agent is meant to use these during a session.
 
 ## License
 

@@ -1,7 +1,9 @@
 # @meris/brainstorm — spec
 
-Status: draft. Sections marked **(built)** match `brainstorm.ts`; **(planned)**
-is not built yet.
+Status: draft. The data model and methods match `brainstorm.ts` (version
+`2026.10.27.1`). The session flow, adversarial review procedure, session
+protocol, report and workflow are **(planned)**: they describe how an agent uses
+the extension and are not enforced by code.
 
 ## Purpose
 
@@ -36,15 +38,15 @@ is a side effect of the conversation, not its purpose.
 A session moves through six phases, and the agent takes a different stance in
 each. This section is the one place that says what the agent does and when.
 
-| #   | Phase               | Stance                | The agent                                                                                   | Ends when                                  |
-| --- | ------------------- | --------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 0   | **Orient**          | Librarian             | Confirms the data set, offers parked drafts, quietly finds related stored ideas.            | The data set is known                      |
-| 1   | **Intake**          | Listener              | Takes in everything. Does not edit, push back or interrogate.                               | The person has said what they came to say  |
-| 2   | **Get up to speed** | Interviewer           | Asks alignment and clarifying questions, then restates the idea and the problem.            | The person confirms the restatement        |
-| 3   | **Refine**          | Editor and partner    | Writes the statement, goal and elements; offers options; challenges lightly; links ideas.   | The person says the draft is ready         |
-| 4   | **Gate**            | Checker               | Shows the draft, runs the duplicate check, offers the menu.                                 | The person commits, parks, splits or discards |
-| 5   | **Commit**          | Scribe                | Writes the records and shows exactly what it wrote.                                         | Records are written                        |
-| —   | **Review**          | Skeptic (separate agent) | Attacks the idea, only when the person asks (see Adversarial review).                    | The critique is recorded                   |
+| # | Phase               | Stance                   | The agent                                                                                 | Ends when                                     |
+| - | ------------------- | ------------------------ | ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 0 | **Orient**          | Librarian                | Confirms the data set, offers parked drafts, quietly finds related stored ideas.          | The data set is known                         |
+| 1 | **Intake**          | Listener                 | Takes in everything. Does not edit, push back or interrogate.                             | The person has said what they came to say     |
+| 2 | **Get up to speed** | Interviewer              | Asks alignment and clarifying questions, then restates the idea and the problem.          | The person confirms the restatement           |
+| 3 | **Refine**          | Editor and partner       | Writes the statement, goal and elements; offers options; challenges lightly; links ideas. | The person says the draft is ready            |
+| 4 | **Gate**            | Checker                  | Shows the draft, runs the duplicate check, offers the menu.                               | The person commits, parks, splits or discards |
+| 5 | **Commit**          | Scribe                   | Writes the records and shows exactly what it wrote.                                       | Records are written                           |
+| — | **Review**          | Skeptic (separate agent) | Attacks the idea, only when the person asks (see Adversarial review).                     | The critique is recorded                      |
 
 Nothing is written to the store until the gate, except a parked draft.
 
@@ -54,8 +56,8 @@ Nothing is written to the store until the gate, except a parked draft.
   phase at any point, and if they ask for something from another phase (a
   challenge during intake, say), the agent does it. New information at the gate
   sends the session back to refine.
-- **The person is in charge.** Suggestions are proposals. The person decides what
-  is committed, what status an idea has, and which direction to explore.
+- **The person is in charge.** Suggestions are proposals. The person decides
+  what is committed, what status an idea has, and which direction to explore.
 - **No invented facts.** Where the person has not said something, the agent
   leaves it empty, records it as an open question, and says when it is guessing.
 - **Read the person.** A correction, a hesitation, "sort of", or an answer to a
@@ -72,19 +74,20 @@ says.
 
 ### Intake (listener)
 
-The person describes the idea loosely and gives context: where it came from, what
-prompted it, what they have already thought about. The agent takes it in and
-keeps the person's own words, which become `rawNotes`. It asks nothing beyond
-what is needed to keep the person talking, offers no opinion, and does not
-restructure what it hears. Premature questions at this stage cut the person off.
+The person describes the idea loosely and gives context: where it came from,
+what prompted it, what they have already thought about. The agent takes it in
+and keeps the person's own words, which become `rawNotes`. It asks nothing
+beyond what is needed to keep the person talking, offers no opinion, and does
+not restructure what it hears. Premature questions at this stage cut the person
+off.
 
 ### Get up to speed (interviewer)
 
 The agent's goal is to understand the idea and the problem behind it as the
-person does. A clarifying question fills a gap in the idea. An alignment question
-tests whether the agent and the person mean the same thing. The agent does not
-assume a confident-sounding restatement is a correct one. It asks one or two
-questions at a time, not a questionnaire, and:
+person does. A clarifying question fills a gap in the idea. An alignment
+question tests whether the agent and the person mean the same thing. The agent
+does not assume a confident-sounding restatement is a correct one. It asks one
+or two questions at a time, not a questionnaire, and:
 
 - **checks the problem as well as the solution:** "is the problem you are
   solving X, or is X a symptom of something else?";
@@ -108,17 +111,18 @@ a quote of what was said:
 
 - a **statement**: one or two plain sentences saying what the idea is;
 - a **goal**: what the idea is for and what success looks like;
-- the **other elements** that make it understandable: the problem, who it is for,
-  the approach, what makes it different, assumptions, risks, and anything else
-  it needs.
+- the **other elements** that make it understandable: the problem, who it is
+  for, the approach, what makes it different, assumptions, risks, and anything
+  else it needs.
 
 It then partners with the person:
 
 - **offers options and suggestions:** variations, alternative approaches, scope
   cuts and extensions, each with a short trade-off and a recommendation when it
   has one, not just a list of possibilities;
-- **challenges lightly:** names obvious risks and says when it thinks the idea is
-  weak or already done elsewhere. The thorough version is the separate review;
+- **challenges lightly:** names obvious risks and says when it thinks the idea
+  is weak or already done elsewhere. The thorough version is the separate
+  review;
 - **connects it to memory:** surfaces related, contradicting or overlapping
   ideas from the store, proposes links, and points out prior art it knows or
   found;
@@ -133,8 +137,8 @@ ready.
 At the gate the agent shows the finished draft with its open questions and
 confirms alignment is as the person left it, then:
 
-1. **Always runs the duplicate check** and reports the result. It is read-only and
-   cheap, and it prevents a second copy of an idea that already exists. The
+1. **Always runs the duplicate check** and reports the result. It is read-only
+   and cheap, and it prevents a second copy of an idea that already exists. The
    agent compares the draft against stored ideas (narrowing by tags and title
    first, then reading the close ones) and against stored prior art, and sorts
    each close match into one of:
@@ -161,10 +165,12 @@ confirms alignment is as the person left it, then:
 ### Commit (scribe)
 
 Commit writes the idea (with `rawNotes` from the intake and refine phases and
-`alignment` set to what the person actually confirmed), then any links, prior art
-and critique records. It prints what it wrote. If the idea was merged into an
-existing one, it is a new version of that record. The agent may make a local git
-commit in the central repo when asked, and never pushes.
+`alignment` set to what the person actually confirmed), then any links, prior
+art and critique records. It prints what it wrote. If the idea was merged into
+an existing one, it is a new version of that record. The order matters: links,
+research, prior art and critiques fail if an idea they name does not exist yet,
+so every idea, including a split's sub-ideas, is written first. The agent may
+make a local git commit in the central repo when asked, and never pushes.
 
 ### Drafts
 
@@ -193,8 +199,8 @@ Picking up a `dead`, `parked` or `shipped` idea is a revival. Every version is
 kept, so the idea's history, including the time it was set aside, stays
 recoverable. In addition to the normal flow:
 
-- The agent asks what changed: new information, new circumstances or a
-  different goal. The answer goes into `rawNotes`, and it is what tells a later
+- The agent asks what changed: new information, new circumstances or a different
+  goal. The answer goes into `rawNotes`, and it is what tells a later
   adversarial review which earlier findings no longer apply.
 - The status returns to `exploring`, or to `seed` if the idea is mostly
   rewritten. The person picks.
@@ -206,10 +212,10 @@ recoverable. In addition to the normal flow:
 A split is a fourth exit at the gate, next to commit, park and discard. There
 are two kinds, and they use different links:
 
-| Kind          | Meaning                                                      | Link on each new idea           | Parent afterwards                                              |
-| ------------- | ------------------------------------------------------------ | ------------------------------- | -------------------------------------------------------------- |
-| **Component** | The idea is broken into parts that together make the whole.  | `part-of` the parent            | Becomes the umbrella: its statement describes the whole and its elements name the parts. |
-| **Offshoot**  | A new idea came out of the old one, which remains whole.     | `spawned-from` the parent       | Unchanged, keeps its own status.                               |
+| Kind          | Meaning                                                     | Link on each new idea     | Parent afterwards                                                                        |
+| ------------- | ----------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
+| **Component** | The idea is broken into parts that together make the whole. | `part-of` the parent      | Becomes the umbrella: its statement describes the whole and its elements name the parts. |
+| **Offshoot**  | A new idea came out of the old one, which remains whole.    | `spawned-from` the parent | Unchanged, keeps its own status.                                                         |
 
 How a split works:
 
@@ -217,13 +223,13 @@ How a split works:
    goal, and checks alignment for each one.
 2. Each sub-idea goes through the duplicate check, since a part may already
    exist as an idea of its own.
-3. Everything is written together, as at any commit: the sub-ideas, their
-   links to the parent, and the parent's new version if it changed.
+3. Everything is written together, as at any commit: the sub-ideas, their links
+   to the parent, and the parent's new version if it changed.
 4. The parent is never marked `dead` by a split unless the person says so.
 5. A sub-idea is a normal idea, so it can be split again.
 
-The umbrella parent's status is set by the person. It does not follow the
-status of its parts. Automatic rollup is a possible later addition.
+The umbrella parent's status is set by the person. It does not follow the status
+of its parts. Automatic rollup is a possible later addition.
 
 ## Adversarial review (planned)
 
@@ -257,8 +263,8 @@ The reviewer works through these lenses and skips any that do not apply:
 2. **Premortem** (Gary Klein). Assume it is a year later and the idea has
    failed. List the plausible reasons. List only; no fixes during this step,
    because solutions get in the way of an exhaustive list.
-3. **Assumption map.** List what must be true for the idea to work. Rate each
-   by how much it matters and how much evidence supports it. Name the riskiest
+3. **Assumption map.** List what must be true for the idea to work. Rate each by
+   how much it matters and how much evidence supports it. Name the riskiest
    assumption (important, no evidence) and the cheapest way to test it.
 4. **Devil's advocate** (CIA tradecraft). Build the best case for the
    alternative: do nothing, use what already exists, or take the opposite
@@ -277,7 +283,8 @@ The reviewer works through these lenses and skips any that do not apply:
   marked as speculation. A wrong disproof is worse than a missing one.
 - Findings state problems, not fixes. Fixes belong to the next conversation.
 - The review also says what is strong and what would change its mind. It is not
-  balanced for its own sake, but a review with no way to be wrong cannot be used.
+  balanced for its own sake, but a review with no way to be wrong cannot be
+  used.
 - It does not give a go or no-go verdict. The person decides.
 
 ### Recording
@@ -288,43 +295,48 @@ is not raised again by the next review unless the idea has changed.
 
 ### Research notes and limits
 
-Sources: Klein's premortem and the CIA's 2009 *A Tradecraft Primer* (devil's
+Sources: Klein's premortem and the CIA's 2009 _A Tradecraft Primer_ (devil's
 advocacy, red team, Team A/Team B), assumption mapping and riskiest-assumption
-tests from product practice, and several recent papers on LLM debate and
-critic agents. The premortem steps and the primer's definitions are from
-secondary summaries that I did not check against the originals (Klein's 2007
-Harvard Business Review article and the primer PDF). The claims about LLM
-review come from paper abstracts and show a pattern, not a measured effect size
-for this use. "Steelman first" and "no more than seven findings" are my own
-judgment.
+tests from product practice, and several recent papers on LLM debate and critic
+agents. The premortem steps and the primer's definitions are from secondary
+summaries that I did not check against the originals (Klein's 2007 Harvard
+Business Review article and the primer PDF). The claims about LLM review come
+from paper abstracts and show a pattern, not a measured effect size for this
+use. "Steelman first" and "no more than seven findings" are my own judgment.
 
 ## Data model (built)
 
-Four resources, all `lifetime: infinite`. Each write creates a new version of
+Five resources, all `lifetime: infinite`. Each write creates a new version of
 the named instance.
 
-| Resource   | Instance name              | Fields                                                                     | GC versions |
-| ---------- | -------------------------- | -------------------------------------------------------------------------- | ----------- |
-| `idea`     | slug of title              | id, title, summary, status, tags, project?, createdAt, updatedAt           | 1000        |
-| `link`     | `<from>--<kind>--<to>`     | from, to, kind, note?, createdAt                                           | 1000        |
-| `research` | idea id                    | ideaId, query, sources[], summary, date                                    | 20          |
-| `priorArt` | slug of name               | name, url?, overlap, difference, ideaIds[], date                           | 1000        |
+| Resource   | Instance name                      | Fields                                                                                  | GC versions |
+| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------- | ----------- |
+| `idea`     | slug of title                      | id, title, summary, status, tags, project?, plus the fields below, createdAt, updatedAt | 1000        |
+| `link`     | `<from>--<kind>--<to>`             | from, to, kind, note?, createdAt                                                        | 1000        |
+| `research` | `research--<idea id>`              | ideaId, query, sources[], summary, date                                                 | 20          |
+| `priorArt` | `prior-art--<slug of name>`        | name, url?, overlap, difference, ideaIds[], date                                        | 1000        |
+| `critique` | `critique--<idea id>--<timestamp>` | see below                                                                               | 1000        |
 
-- `status`: `seed`, `exploring`, `parked`, `dead`, `shipped`, and planned
-  `draft` for work in progress (see Drafts). Not to be confused with `parked`,
-  which means a committed idea the person has set aside.
-- `link.kind`: `spawned-from`, `similar-to`, `contradicts`, `builds-on`, and
-  planned `part-of` (child is a component of the parent; see Splitting).
-  `spawned-from` means an offshoot that stands on its own; `part-of` means a
-  piece of a larger whole.
+Instance names are what `readResource` looks up, and swamp keys data by name
+alone. Ideas keep their bare slug; every other kind has a prefix or a `--`
+separator, which a slug never contains, so two kinds cannot share a name and
+overwrite each other.
+
+- `status`: `draft` (work in progress, see Drafts), `seed`, `exploring`,
+  `parked`, `dead`, `shipped`. Not to be confused with `parked`, which means a
+  committed idea the person has set aside.
+- `link.kind`: `spawned-from`, `part-of`, `similar-to`, `contradicts`,
+  `builds-on`. `spawned-from` means an offshoot that stands on its own;
+  `part-of` means the child is a component of the parent (see Splitting).
 - `project` on an idea records which project the idea came up in. It is a label,
   not a separate store.
 
-### Planned `idea` fields
+### `idea` fields for the edited idea
 
 The agent's edited version and its open items are stored with the idea, next to
 the person's own words, so the edit never replaces the source. All fields are
-optional so existing records stay valid.
+optional so existing records stay valid. A new idea starts as a `seed` with
+`alignment` set to `unchecked`.
 
 - `statement` — the edited one- or two-sentence description of the idea.
 - `goal` — what the idea is for and what success looks like.
@@ -340,29 +352,35 @@ optional so existing records stay valid.
   reports show it that way.
 - `openQuestions` — questions still unanswered, including every element the
   person has not yet described.
-- `options` — alternatives or variations discussed, each with a short
-  trade-off and a note on whether it was chosen, rejected or left open.
+- `options` — alternatives or variations discussed, each with a short trade-off
+  and a note on whether it was chosen, rejected or left open.
 
 The existing `summary` stays as the short form shown in lists.
 
-### Planned `critique` resource
+### `critique` fields
 
-A fifth resource holds an adversarial review: ideaId, date, lenses used, the
-steelman, findings (claim, severity, basis, confidence, and the person's
-response), the riskiest assumption with its cheapest test, and what would change
-the reviewer's mind. It is `lifetime: infinite`.
+ideaId, date, lenses used, the steelman, findings (at most seven: claim,
+severity, basis, confidence, and the person's response), strengths, the riskiest
+assumption with its cheapest test, and what would change the reviewer's mind.
+Findings are stored most severe first.
 
 ## Methods
 
-Built: `captureIdea`, `linkIdeas`, `recordResearch`, `recordPriorArt`. See the
-README for usage.
+Built (see the README for usage):
+
+- `captureIdea` — create an idea, or update it if the title exists. Only the
+  fields passed change, and `createdAt` is kept.
+- `updateIdea` — change fields of an existing idea by id. Arrays are replaced,
+  `elements` merge by key (an empty value removes a key), and `rawNotes` are
+  appended. Fails if the idea does not exist.
+- `linkIdeas` — link two existing ideas. Fails if either is missing or both are
+  the same.
+- `recordResearch`, `recordPriorArt` — fail if an idea they name does not exist.
+- `recordCritique` — store a review of an existing idea.
+- `respondToFinding` — record the person's response to one finding.
 
 Planned:
 
-- `updateIdea` — change status, summary, tags, `statement`, `goal`, `elements`,
-  `alignment`, `openQuestions` or `options` on an existing idea, and append to
-  `rawNotes`,
-  without resending every field (see known gaps).
 - `gather` research step — evaluate `@webframp/research-collector` (HN,
   Lobste.rs, arXiv, SRE Weekly, RedMonk; methods `gather`, `digest`) with
   `swamp extension info` before pulling it. Fan-out over sources in one method
@@ -401,8 +419,8 @@ once. The catalog is per-clone and is rebuilt from disk on the next query.
 
 Text for a CLAUDE.md section or skill in projects that use a data set:
 
-1. **Confirm the data set first** (work or personal) and set `SWAMP_REPO_DIR`
-   to it. Never write without knowing which set a conversation belongs to.
+1. **Confirm the data set first** (work or personal) and set `SWAMP_REPO_DIR` to
+   it. Never write without knowing which set a conversation belongs to.
 2. **Orient.** List parked drafts and offer to resume one. Query the store for
    related ideas by tag and title:
    `swamp data query 'behavior("brainstorm") && tags.specName == "idea"'`.
@@ -421,35 +439,44 @@ Text for a CLAUDE.md section or skill in projects that use a data set:
 7. **Commit writes everything together:** the idea, its links (`linkIdeas`),
    prior art (`recordPriorArt`) and any critique. Show what was written. A split
    writes all sub-ideas, their `part-of` or `spawned-from` links and the
-   parent's new version in the same step.
-   When reviving a `dead`, `parked` or `shipped` idea, ask what changed and
-   recheck alignment first.
+   parent's new version in the same step. When reviving a `dead`, `parked` or
+   `shipped` idea, ask what changed and recheck alignment first.
 8. **Park before closing** if the session ends before the gate.
 9. **Always pass `--skip-reports`.**
 10. Never `git push`. Tell the person what to commit and push.
 
 ## Report (planned)
 
-A report extension (CLAUDE.md rule 8) that renders the store as an index and map:
-ideas grouped by status, per-idea pages with research and prior art, and the
-idea-link graph. Markdown first, HTML later.
+A report extension (CLAUDE.md rule 8) that renders the store as an index and
+map: ideas grouped by status, per-idea pages with research and prior art, and
+the idea-link graph. Markdown first, HTML later.
 
 ## Workflow (planned)
 
-A swamp workflow for the repeatable research path, run on request:
-recall similar, research (fan-out over sources), extract prior art, link and
-classify, render the report. Guarded so it is idempotent.
+A swamp workflow for the repeatable research path, run on request: recall
+similar, research (fan-out over sources), extract prior art, link and classify,
+render the report. Guarded so it is idempotent.
 
-## Known gaps in the built code
+## Fixed bugs and known gaps
 
-- `captureIdea` writes `createdAt = updatedAt = now` on every call, so an update
-  loses the original creation time.
-- `captureIdea` replaces the whole record: calling it with just a title resets
-  summary, status and tags to their defaults.
-- `linkIdeas`, `recordResearch` and `recordPriorArt` do not check that the idea
-  ids they reference exist.
+Fixed in `2026.10.27.1`:
+
+- `captureIdea` reset `createdAt` on every call.
+- `captureIdea` replaced the whole record, so a call with just a title reset the
+  summary, status and tags.
+- `recordResearch` stored research under the idea's own instance name, so it
+  overwrote the idea itself (found by testing in swamp). `recordPriorArt` could
+  do the same when a name matched an idea title. Every kind now has its own
+  instance names.
+- `linkIdeas`, `recordResearch` and `recordPriorArt` did not check that the
+  ideas they reference exist.
+
+Known gaps:
+
 - Two writers editing the same idea conflict in git, and conflict markers make
   swamp fail to parse the data. This is why the store has a single writer.
+- A record with an older shape is read as stored. Nothing migrates the first
+  versions of the schema, so only the optional-fields rule keeps them valid.
 
 ## Open questions
 
@@ -458,7 +485,7 @@ classify, render the report. Guarded so it is idempotent.
   is public.
 - What does the first report page look like, and where is it published?
 - How should the duplicate check scale once the store holds hundreds of ideas?
-  Narrowing by tags and title and then reading the close matches is the
-  starting point; it may need a method that returns candidates.
+  Narrowing by tags and title and then reading the close matches is the starting
+  point; it may need a method that returns candidates.
 - Can a method hold a draft in the session, or does the agent keep it only in
   the conversation? Current plan: the conversation, plus a parked `draft`.
