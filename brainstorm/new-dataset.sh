@@ -50,7 +50,9 @@ swamp behavior create @meris/brainstorm brainstorm > /dev/null
 swamp datastore setup filesystem --path ./store --directories data > /dev/null
 
 # Setup writes an absolute path, which makes every clone use this clone's store.
-perl -0pi -e 's/path: >-\n\s+\S+\n/path: .\/store\n/' .swamp.yaml
+# Older swamp wrapped the path (`path: >-` and the value on the next line); newer
+# swamp writes it on one line (possibly with $HOME).
+perl -0pi -e 's/(datastore:\n(?:  .*\n)*?  path:) (?:>-\n\s+\S+|\S+)\n/$1 .\/store\n/' .swamp.yaml
 grep -q '^  path: \./store$' .swamp.yaml || {
   echo "error: could not make the datastore path relative in $target/.swamp.yaml" >&2
   exit 1
