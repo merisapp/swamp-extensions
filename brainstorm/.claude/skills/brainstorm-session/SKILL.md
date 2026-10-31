@@ -1,14 +1,13 @@
 ---
 name: brainstorm-session
 description: >
-  Drive a brainstorming session on the idea factory (@swamp/software-factory
-  running the idea-factory definition) with @meris/brainstorm as the idea store:
-  listen to a loosely described idea, check that you and the person understand
-  it the same way, refine it into a clear statement and goal, and commit it
-  through a gate (duplicate check, optional review). Use when the person says
-  "brainstorm", "I have an idea", "let's think about", "revisit / revive an
-  idea", "what ideas do I have", "resume my draft", or "run a review on this
-  idea".
+  Drive a brainstorming session on the idea factory (`idea-factory`, on
+  @swamp/stagecraft) with @meris/brainstorm as the idea store: listen to a
+  loosely described idea, check that you and the person understand it the same
+  way, refine it into a clear statement and goal, and commit it through a gate
+  (duplicate check, optional review). Use when the person says "brainstorm", "I
+  have an idea", "let's think about", "revisit / revive an idea", "what ideas do
+  I have", "resume my draft", or "run a review on this idea".
 ---
 
 # Brainstorm session
@@ -19,9 +18,11 @@ job is to connect those pieces into an idea someone else could read and
 understand, and to make sure you and the person mean the same thing.
 
 The process is **data, not instructions in this file.** A session is a work item
-on the `idea-factory` model. Each stage carries its own stance and prompt; you
-read them from `status` and follow them. This skill only says how to drive the
-factory and what never to do. The design is in `brainstorm/SPEC.md`.
+on the `idea-factory` factory (`@swamp/stagecraft`). Each stage carries its own stance
+and prompt; `dispatch` prints it and you follow it. This skill only says how to
+drive the factory for this process and what never to do. The generic engine
+skill (`stagecraft`) is installed beside it; where they differ, this file wins
+for idea sessions. The design is in `brainstorm/SPEC.md`.
 
 ## Before anything
 
@@ -29,20 +30,21 @@ factory and what never to do. The design is in `brainstorm/SPEC.md`.
    `~/brainstorm-work` or `~/brainstorm-personal`). Work and personal are
    separate repos on purpose. If you do not know which one this conversation
    belongs to, ask. Never write without knowing. If there is none yet, offer
-   `brainstorm/new-dataset.sh <dir>` from the swamp-extensions repo.
+   `brainstorm/create-dataset.sh <dir>` from the swamp-extensions repo.
 2. **Prefix every swamp command with the data set**, because you are usually in
    another project: `SWAMP_REPO_DIR=<dir> swamp ...` (or `--repo-dir <dir>`).
 3. **Hard rules**
-   - **Never call `approve` or `reject` on your own.** They are the person's
-     decisions. Show exactly what they would be approving, ask, and call
-     `approve` only on their explicit words in this conversation, for the thing
-     you showed. Do not infer approval from silence or from enthusiasm. The
-     gates cannot tell you from them; this rule is what makes them mean
-     anything.
+   - **Never decide for the person.** `approve`, `decline`, `advance` with
+     `confirm=true` (a manual exit: `realign`, `refine-more`, `park`,
+     `back-to-gate`, `proceed-unconfirmed`, `resume`) and `reset` are theirs.
+     Show exactly what they would be deciding, ask, and run it only on their
+     explicit words in this conversation, with `onBehalfOf` naming them. Do not
+     infer approval from silence or from enthusiasm. The gates cannot tell you
+     from them; this rule is what makes them mean anything.
    - **Never `git push`.** Tell the person what to commit and push. You may make
      a local commit in the data set when asked.
    - **Pass `--skip-reports`** on every swamp call that writes, including every
-     factory call. The exceptions are `renderIndex` (use `--report`) and
+     work-item call. The exceptions are `renderIndex` (use `--report`) and
      `summary`.
    - **Do not invent facts.** What the person has not said is an open question,
      and you say when you are guessing.
@@ -52,101 +54,103 @@ factory and what never to do. The design is in `brainstorm/SPEC.md`.
 
 ## The loop
 
-One session is one work item: `W=<short-slug>-<n>` (for example
-`offline-sync-1`). The work item is the session, not the idea; the idea's id
-comes from its title at commit. All commands:
-`swamp model method run idea-factory <method> --skip-reports --input workItem=$W ...`.
+One session is one work item, under a key you choose: `<short-slug>-<n>` (for
+example `offline-sync-1`). The work item is the session, not the idea; the
+idea's id comes from its title at commit. Every work-item call is
+`swamp model @swamp/stagecraft/work-item method run <method> $W --skip-reports ...`;
+see [references/factory-driving.md](references/factory-driving.md) for each one.
 
-1. **Find or start.** No work item means a factory-wide overview of every run
-   (parked and active): `... status` then
-   `swamp data query 'modelName == "idea-factory" && name == "status-_factory"' --select 'attributes.runs' --json`.
-   Offer to resume a parked or active one. Otherwise `start`.
-2. **Read the stage.** `status`, then query only what you need from `status-$W`:
-   the stage id, `attributes.work.systemPrompt` (your stance for this stage),
-   the satisfied transitions, and why the others are blocked. See
-   [references/factory-driving.md](references/factory-driving.md) for the
-   queries.
-3. **`record_dispatch`** before doing the stage's work (a work stage cannot
-   advance without it).
-4. **Do the work as the stage prompt says**, in conversation with the person.
-5. **Record** the stage's product with `record_artifact` or `record_evidence`.
-   Payloads are strict; the shapes are in
-   [references/factory-driving.md](references/factory-driving.md).
-6. **Show the person what you recorded** and get any approval the transition
-   needs (`approve`, only on their words). Then `advance`. If `advance` is
-   refused, the message says exactly what is missing; do the missing thing, do
-   not work around it.
+1. **Find or start.** List the sessions first (factory-driving.md, "Find
+   sessions") and offer to resume a parked or active one. Otherwise `start` a
+   new key with `factory=idea-factory` and a working title.
+2. **Read `status`.** It prints the stage, the `expect:` flags every write
+   needs, and every exit with what it is waiting for. Every write prints the
+   status after it; act on that, never on memory.
+3. **`dispatch`** before doing the stage's work. It prints the stage's prompt
+   (your stance) and the products to record with their schemas.
+4. **Do the work as the prompt says**, in conversation with the person.
+5. **Record** the stage's products with `record_artifact` or `record_evidence`.
+   A payload that does not fit its schema is refused and kept as retry
+   feedback; fix it and record again.
+6. **Advance.** If exactly one exit is ready and it is neither `(manual)` nor
+   `[human: ...]`, advance on it. Otherwise show the person what they would be
+   deciding, lay out the exits, and do what they say. If `advance` is refused,
+   the message says what is missing; do the missing thing, do not work around
+   it.
 7. Repeat until the session is `committed`, `parked` or `discarded`.
 
-The person can jump back at any time: `realign` and `refine-more` are ordinary
-transitions. A jump back needs fresh approvals, which is intended.
+Every way back is manual, so only the person takes it. A jump back needs fresh
+approvals and a fresh duplicate check, which is intended.
 
 ## The stages
 
-| Stage            | Stance                       | You record                               | Leaves by                                                                           |
-| ---------------- | ---------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
-| intake           | Listener                     | `raw-notes`                              | `heard`                                                                             |
-| aligning         | Interviewer                  | `alignment`                              | `confirmed` (needs the person's approval) or `proceed-unconfirmed`                  |
-| refining         | Editor and partner           | `draft`                                  | `ready` (needs approval), `realign`                                                 |
-| gate             | Checker                      | `duplicate-check` evidence               | `commit`, `review`, `split` (each needs approval), `park`, `refine-more`, `discard` |
-| review           | Skeptic, in a separate agent | `review` findings                        | `reviewed`                                                                          |
-| committing       | (a method call)              | `commit-run` evidence                    | `written`, `failed`                                                                 |
-| splitting        | Editor, splitting an idea    | `split` artifact, `split-check` evidence | `ready` (needs approval), `back-to-gate`                                            |
-| committing-split | (a workflow run)             | `split-run` evidence                     | `written`, `failed`                                                                 |
-| parked           |                              |                                          | `resume`, `discard`                                                                 |
+| Stage            | Stance                    | You record                               | Leaves by                                                                         |
+| ---------------- | ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| intake           | Listener                  | `raw-notes`                              | `heard`                                                                           |
+| aligning         | Interviewer               | `alignment`                              | `confirmed` (approval), `proceed-unconfirmed` (manual)                            |
+| refining         | Editor and partner        | `draft`                                  | `ready` (approval), `realign` (manual)                                            |
+| gate             | Checker                   | `duplicate-check` evidence               | `commit`, `review`, `split` (each needs approval), `park`, `refine-more` (manual) |
+| review           | Skeptic, in a subagent    | `review` findings                        | `reviewed` (approval, after the findings are answered)                            |
+| committing       | (a method call)           | `commit-run` evidence                    | `written`, `failed`                                                               |
+| splitting        | Editor, splitting an idea | `split` artifact, `split-check` evidence | `ready` (approval), `back-to-gate` (manual)                                       |
+| committing-split | (a workflow run)          | `split-run` evidence                     | `written`, `failed`                                                               |
+| parked           |                           |                                          | `resume` (manual)                                                                 |
 
-Stage-specific detail lives in each stage's prompt, not here. Two things need
+`discard` leaves any stage, on the person's `discard-confirmation`.
+
+Stage-specific detail lives in each stage's prompt, not here. Three things need
 more than a prompt:
 
 - **The duplicate check (gate).** Narrow stored ideas by tag and key words, read
   only the close ones, sort each match as same-idea / overlaps / opposes /
   unrelated, and record it with the person's decision per match. Recipes are in
   [references/recall.md](references/recall.md). Always do it; the factory will
-  not let you commit without it. Evidence belongs to one visit to a stage, so
+  not let you commit without it. Evidence belongs to one entry into a stage, so
   after a review (or any jump back) the gate is entered again and you redo the
   check: the draft may have changed.
-- **The review (review stage).** Only when the person asks (the transition needs
-  their approval). Use a separate subagent with a fresh context; see
+- **The review (review stage).** Only when the person asks (the `review` exit
+  needs their approval). It is a `dispatch` stage: the engine prints a prompt
+  for a fresh subagent, which you send unchanged. Then you go through the
+  findings with the person; see
   [references/adversarial-review.md](references/adversarial-review.md).
+- **The calls (committing, committing-split).** `dispatch` prints the exact
+  method or workflow and its resolved `inputs`; run exactly that and record the
+  outcome. See below.
 
 ## Committing
 
-The `committing` stage is a method call. `status` resolves its inputs from the
-recorded artifacts; run exactly that call, then record the outcome:
+The `committing` stage calls `brainstorm captureIdea`. `dispatch` resolves its
+inputs from the recorded artifacts and prints them as the packet's `inputs`;
+the packet must say `ready: true` (no `problems`). Run exactly that call, then
+record the outcome with the run's id:
 
 ```sh
-swamp data query "modelName == \"idea-factory\" && name == \"status-$W\"" \
-  --select 'attributes.work.method.inputs' --json | jq '.results[0]' > commit-inputs.json
-swamp behavior run brainstorm captureIdea --skip-reports --input-file commit-inputs.json
-# then record the outcome and advance
-swamp model method run idea-factory record_evidence --skip-reports --input-file commit-evidence.json
-swamp model method run idea-factory advance --skip-reports --input workItem=$W --input transition=written
+# write the packet's inputs object to $SCRATCH/commit-inputs.json
+swamp behavior run brainstorm captureIdea --skip-reports --input-file $SCRATCH/commit-inputs.json --json
+swamp model @swamp/stagecraft/work-item method run record_evidence $W --skip-reports \
+  --input name=commit-run --input 'payload={"status":"succeeded","runId":"<run id>"}' <expect>
+swamp model @swamp/stagecraft/work-item method run advance $W --skip-reports \
+  --input transition=written <expect>
 ```
 
-`commit-evidence.json` is
-`{"workItem": "...", "name": "commit-run", "payload":
-{"status": "succeeded", "runId": "<something that identifies the call>"}}`.
-If the call failed, record `status: failed` and advance `failed`, which returns
-to the gate. Put scratch files in your scratchpad, not the data set. Check
-`unresolvedBindings` in `status` is empty before you run it.
+If the call failed, record `status: failed` with its run id and advance `failed`,
+which returns to the gate. Never record a run you did not see finish. Put
+scratch files in your scratchpad, not the data set.
 
 ## Splitting
 
 A split is a gate exit (`split`, needs the person's approval). The `splitting`
 stage's prompt says how to draft it: a component split makes the parent an
 umbrella and links each part `part-of`; an offshoot split leaves the parent
-whole and links each new idea `spawned-from`. The `committing-split` stage is a
-swamp workflow, `brainstorm-split`, which writes the parent, then every part,
-then the links (ideas first, because links to a missing idea fail). Run exactly
-what `status` resolved, **without `--skip-reports`**: the stage's
-`workflow-succeeded` gate checks swamp's own record of the run, which is built
-from the run's report, and it rejects a made-up or report-less run id.
+whole and links each new idea `spawned-from`. The `committing-split` stage runs
+the swamp workflow `brainstorm-split`, which writes the parent, then every
+part, then the links (ideas first, because links to a missing idea fail). Run
+exactly the workflow and `inputs` that `dispatch` printed, and record its run:
 
 ```sh
-swamp data query "$Q" --select 'attributes.work.workflow.inputs' --json | jq '.results[0]' > wf-inputs.json
-swamp workflow run brainstorm-split --input-file wf-inputs.json --json > wf-run.json   # no --skip-reports
-RUN=$(jq -r '.id' wf-run.json)
-# record_evidence split-run {"status": "succeeded", "runId": "<RUN>"}, then advance written
+# write the packet's inputs object to $SCRATCH/wf-inputs.json
+swamp workflow run brainstorm-split --input-file $SCRATCH/wf-inputs.json --json > $SCRATCH/wf-run.json
+# record_evidence split-run {"status": "succeeded", "runId": "<the run's id>"}, then advance written
 ```
 
 If the run failed, record `status: failed` with its run id and advance `failed`,
@@ -162,9 +166,10 @@ what changed (new information, circumstances, or goal) and put the answer in
 `seed` if mostly rewritten). Use the same title so the commit merges into the
 existing idea. Every version is kept.
 
-**Park** from the gate when the person stops before deciding; the session waits
-in `parked` and shows up in the factory-wide overview. If a conversation ends
-before the gate, offer to park it first.
+**Park** from the gate when the person stops before deciding (a manual exit, on
+their word); the session waits in `parked` and shows up when you list sessions.
+Before the gate there is no park exit: a session that ends earlier simply stays
+in its stage and is resumed by its key, so tell the person the key.
 
 ## After writing
 
@@ -176,8 +181,7 @@ SWAMP_REPO_DIR=<dir> swamp report get @meris/brainstorm-index --model brainstorm
 ```
 
 Do not add `--skip-reports` there. For the history of one session:
-`... summary --input workItem=$W` then
-`swamp report get @swamp/software-factory/work-item-summary --model idea-factory --markdown`.
+`swamp model @swamp/stagecraft/work-item method run summary $W`.
 
 Other commands (research, prior art, linking ideas, standalone reviews of stored
 ideas) are in [references/commands.md](references/commands.md).

@@ -1,35 +1,85 @@
 # Driving the idea factory
 
-Every call: `swamp model method run idea-factory <method> --skip-reports ...`
+Every work-item call:
+`swamp model @swamp/stagecraft/work-item method run <method> $W --skip-reports ...`
 against the data set (`SWAMP_REPO_DIR=<dir>` or `--repo-dir <dir>`). `$W` is the
-work item. The generic engine skill (`software-factory`) may also be installed
-in the data set repo; this file is the version for this factory.
+work item (the session's key). The generic engine skill (`stagecraft`) is
+installed in the data set too; its `references/driving.md` covers everything
+here in full, and this file is the short version for this factory.
 
-Structured inputs (artifact and evidence payloads) go in a JSON file passed with
-`--input-file`, shaped `{"workItem": "...", "name": "...", "payload": {...}}`.
-Put those files in your scratchpad.
+Run methods without `--log`, and read their output whole: never filter it
+through `grep`, `head` or `tail`, or a prompt, an exit or a refusal is missed.
+Run one write per command and read its output before the next.
 
-## Reading the status
+## Find sessions
 
-`status` writes a record; query only the fields you need:
+Every session has a `run` record naming its factory (work items are created on
+`start`, so `swamp model search` does not list them):
 
 ```sh
-Q='modelName == "idea-factory" && name == "status-'$W'"'
-swamp data query "$Q" --select '{"stage": attributes.stage.id, "cycle": attributes.stage.cycle}' --json
-# your stance for this stage
-swamp data query "$Q" --select 'attributes.work.systemPrompt' --json
-# which transitions can I take now?
-swamp data query "$Q" --select 'attributes.transitions.filter(t, t.satisfied).map(t, t.name)' --json
-# why is a transition blocked? (the reasons say exactly what to do)
-swamp data query "$Q" --select 'attributes.transitions.filter(t, !t.satisfied).map(t, {"transition": t.name, "blockedBy": t.gates.filter(g, !g.pass).map(g, g.reasons)})' --json
-# approvals waiting on the person
-swamp data query "$Q" --select 'attributes.pendingApprovals' --json
+swamp data query 'name == "run" && attributes.factory == "idea-factory"' \
+  --select '{"key": attributes.key, "title": attributes.title, "stage": attributes.stage, "status": attributes.status}' --json
 ```
 
-Without a work item, `status` gives the overview of every run:
-`swamp data query 'modelName == "idea-factory" && name == "status-_factory"' --select 'attributes.runs' --json`.
+Offer the parked and active ones (`status` is `active` for both; `stage` says
+`parked`), then read `status` on the one the person picks.
 
-## Payload shapes (strict: an undeclared key is rejected)
+## Start, status and the expectation
+
+```sh
+swamp model @swamp/stagecraft/work-item method run start $W --skip-reports \
+  --input factory=idea-factory --input 'title=<working title>'
+swamp model @swamp/stagecraft/work-item method run status $W
+```
+
+`status` prints the stage, an `expect:` line, and every exit with what it waits
+for. Copy the three `--input expected...=` flags from `expect:` into every
+write (written `<expect>` below). A write whose expectation no longer matches is
+refused and writes nothing: read `status` again. Every write ends its output
+with the status after it.
+
+How to read an exit line:
+
+- `ready` / `not ready: ...`: whether `advance` would take it now, and if not,
+  which gate is missing what.
+- `(manual)`: only the person sends the session this way; `advance` needs
+  `--input confirm=true` and `--input onBehalfOf=<their name>`.
+- `[human: <gate-id>]`: the person must approve that gate first.
+
+## Do a stage's work
+
+```sh
+swamp model @swamp/stagecraft/work-item method run dispatch $W --skip-reports <expect>
+```
+
+`dispatch` prints the stage's prompt (your stance), then a JSON packet:
+`products` (each artifact and evidence to record, with its schema), `inject`
+(products to read first), and for `committing` and `committing-split` the
+`method` or `workflow` to call and its resolved `inputs`. Dispatch once per
+attempt at the stage's work, not per tool call. For the `review` stage, add
+`--input resultDir=<a scratch directory>`; see adversarial-review.md.
+
+To read a recorded product (to show the person, or to check a value):
+
+```sh
+swamp data query 'modelName == "'$W'" && name == "artifact-draft"' --select content --single --json
+swamp data query 'modelName == "'$W'" && name == "evidence-duplicate-check"' --select content --single --json
+```
+
+## Record products
+
+```sh
+swamp model @swamp/stagecraft/work-item method run record_artifact $W --skip-reports \
+  --input name=draft --input payload=@$SCRATCH/draft.json <expect>
+swamp model @swamp/stagecraft/work-item method run record_evidence $W --skip-reports \
+  --input name=duplicate-check --input payload=@$SCRATCH/dup.json <expect>
+```
+
+`payload` is inline JSON or `@<path>` to a JSON file; put files in your
+scratchpad. A payload that does not fit is refused, kept as retry feedback, and
+shown in `status`; fix it and record again.
+
+## Payload shapes
 
 **`raw-notes`** (artifact, intake). The person's own words, as said.
 
@@ -87,30 +137,16 @@ empty `matches` list is valid when nothing came close.
 }
 ```
 
-**`review`** (findings artifact, review stage). `id`, `severity` and
-`description` are required; severity is `critical`, `high`, `medium` or `low`.
-Put the basis and confidence in the description, for example
-`"<claim> (basis: research; high confidence)"`, and the lens in `category`.
+**`review`** (findings artifact, review stage). The subagent writes it; its
+prompt carries the schema. Each finding has `id`, `severity` (`critical`,
+`high`, `medium`, `low`) and `description`, with the lens in `category`. The
+top level also carries `steelman`, `strengths`, `riskiestAssumption` and
+`wouldChangeMind`. To record the person's answer to a finding, record the whole
+artifact again with that finding's `resolved: true` and `resolutionNote`.
 
-```json
-{
-  "findings": [
-    {
-      "id": "ADV-1",
-      "severity": "high",
-      "category": "premortem",
-      "description": "Cache invalidation is not addressed (basis: reasoning only; medium confidence)."
-    }
-  ]
-}
-```
-
-Resolve a finding with the person's answer: `resolve_findings` with
-`{"workItem": "...", "artifact": "review", "resolutions": [{"findingId": "ADV-1", "note": "Accepted: add an invalidation section."}]}`.
-
-**`commit-run`** (evidence, committing):
-`{"status": "succeeded", "runId": "..."}` or
-`{"status": "failed", "runId": "..."}`.
+**`commit-run`** (evidence, committing) and **`split-run`** (evidence,
+committing-split): `{"status": "succeeded", "runId": "<run id>"}` or
+`{"status": "failed", "runId": "<run id>"}`. `runId` is required.
 
 **`split`** (artifact, splitting). `kind` is `component` or `offshoot`. `parent`
 is the idea being split (for a component split, rewrite its `statement` as the
@@ -148,40 +184,40 @@ non-digits turned into one hyphen, at most 60 characters (`"Conflict Policy"` is
 ```
 
 **`split-check`** (evidence, splitting): the same shape as `duplicate-check`,
-covering every part. **`split-run`** (evidence, committing-split):
-`{"status": "succeeded", "runId": "<the workflow run id>"}`; the run id is
-checked against swamp's own record.
+covering every part.
 
-## Approvals
+## Approvals and the person's decisions
 
 Gate ids and where they sit: `alignment-confirmed` (aligning, `confirmed`),
 `draft-ready` (refining, `ready`), `commit-decision` (gate, `commit`),
 `review-requested` (gate, `review`), `split-decision` (gate, `split`),
-`split-ready` (splitting, `ready`), `discard-confirmation` (`discard`).
+`review-discussed` (review, `reviewed`), `split-ready` (splitting, `ready`),
+`discard-confirmation` (`discard`, from any stage).
 
 ```sh
-swamp model method run idea-factory approve --skip-reports \
-  --input workItem=$W --input gateId=draft-ready --input actor=<the person's name> \
-  --input note="<what they said>"
+swamp model @swamp/stagecraft/work-item method run approve $W --skip-reports \
+  --input gateId=draft-ready --input 'note=<what they said>' \
+  --input 'onBehalfOf=<the person>' <expect>
+swamp model @swamp/stagecraft/work-item method run advance $W --skip-reports \
+  --input transition=ready <expect>
 ```
 
-Call it only after the person has said yes to what you showed them. `actor` is
-the person, not you. Approvals belong to one stage visit: after a jump back you
-need a new one.
+Call `approve` only after the person has said yes to what you showed them; if
+they say no, `decline` with their words. A manual exit is the same: on their
+word, `advance` with `--input confirm=true --input 'onBehalfOf=<the person>'`.
+Approvals belong to one entry into a stage: after a jump back you need a new
+one.
 
-## When `advance` is refused
+## When something is refused
 
-Read the message. Typical causes, and the fix:
-
-| Message                                                                            | Fix                                                                                                                                               |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stage-executed` ... call record_dispatch                                          | `record_dispatch`, then `advance`                                                                                                                 |
-| `artifact '...' has not been recorded`                                             | record it (shape above)                                                                                                                           |
-| `evidence '...' has not been recorded`                                             | record it                                                                                                                                         |
-| `evidence '...' was recorded in stage '...' cycle N, not during the current entry` | the stage was re-entered (for example the gate after a review): record fresh evidence. Redo the duplicate check, since the draft may have changed |
-| `awaiting human approval '<id>'`                                                   | get the person's decision; `approve` only on their words                                                                                          |
-| `The alignment artifact must record state "confirmed"`                             | the person has not confirmed: keep aligning, or take `proceed-unconfirmed`                                                                        |
-| `runaway-loop-suspected`                                                           | you dispatched the same stage entry three times; stop and ask the person                                                                          |
-
-A stage dies at its `maxCycles` (5 re-entries). If you reach it, ask the person;
-a cycle override is their approval, not yours.
+| Message                                                           | Fix                                                                                                                       |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `stale: ...`                                                      | read `status`; act on what it says now                                                                                    |
+| `... rejected and kept as retry feedback`                         | fix the payload from the errors (also in `status`); record again                                                          |
+| `artifact '...' has not been recorded`                            | record it (shape above)                                                                                                   |
+| `evidence '...' has not been recorded`                            | record it                                                                                                                 |
+| `... not in this entry into '<stage>' (cycle N); record it again` | the stage was re-entered (the gate after a review, say): record fresh evidence, and redo the duplicate check              |
+| `awaiting approval '<id>'`                                        | get the person's decision; `approve` only on their words                                                                  |
+| `The alignment artifact must record state "confirmed"`            | the person has not confirmed: keep aligning, or ask whether to take `proceed-unconfirmed`                                 |
+| `transition ... is manual`                                        | ask the person; `confirm=true` only on their word                                                                         |
+| cycle limit, `runaway loop suspected`                             | stop and lay out every exit to the person; a `grant_override` is theirs to give                                           |

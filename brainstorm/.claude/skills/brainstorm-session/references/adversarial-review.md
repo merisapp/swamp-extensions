@@ -4,7 +4,34 @@ Run only when the person asks. The review is a separate subagent with a fresh
 context, so it does not inherit your rapport with the person or the framing you
 built with them. It uses the same model as you.
 
-## How to run it
+## During a session (the factory's `review` stage)
+
+The stage is a `dispatch` stage, and its prompt is the factory's, not the one
+below: the factory's review prompt carries the same lenses and rules, in the
+`review` findings shape.
+
+1. `dispatch` with `--input resultDir=<a scratch directory>`. It prints one
+   subagent prompt between `--- subagent 1 of 1 prompt ---` and
+   `--- end subagent 1 prompt ---`.
+2. Start a subagent (the Agent tool, general-purpose) from the data set's
+   directory and send it that prompt **exactly as printed**: never shorten,
+   reword or add to it, and never add the conversation. It reads the draft
+   from the store and writes its findings to the file the prompt names.
+3. Check the file against the rules (at most seven findings, every finding has
+   a basis, no fixes). If it breaks them, dispatch again and send the new
+   prompt; do not edit the findings yourself.
+4. `record_artifact review` with `payload=@<that file>`, then `record_usage`
+   for the dispatch with the token count, tool uses and duration the harness
+   reported for the subagent.
+5. Show the person the findings, most severe first, with the steelman,
+   strengths, riskiest assumption and what would change the reviewer's mind.
+   Take each of their answers and record the artifact again with that
+   finding's `resolved: true` and `resolutionNote` in their words.
+6. When they have gone through it, ask for `review-discussed` and approve it
+   only on their word. The session then returns to the gate, where the
+   duplicate check is redone.
+
+## On a stored idea, later
 
 1. Read the stored idea in full (recall.md: "One idea in full"), plus its
    research, prior art, links and any earlier critiques.
@@ -13,21 +40,9 @@ built with them. It uses the same model as you.
    any `swamp` command that writes, and not to edit files.
 3. Check its answer against the rules below (at most seven findings, every
    finding has a basis, no fixes). Send it back if it breaks them.
-4. Record it, show the findings to the person most severe first, and record each
-   of their answers. Where depends on the situation:
-   - **During a session** (the factory's `review` stage): the idea is not stored
-     yet, so record the findings as the session's `review` artifact and resolve
-     each with the person's answer (`resolve_findings`). Convert the reviewer's
-     JSON: `fatal` is `critical`, `serious` is `high`, `minor` is `low`; `claim`
-     becomes `description` with the basis and confidence appended
-     (`"<claim> (basis: research; high confidence)"`); the lens goes in
-     `category`; number them `ADV-1`, `ADV-2`... The strengths, riskiest
-     assumption and what would change the reviewer's mind go in the `note` you
-     show the person; they are not part of the artifact. The shapes are in
-     factory-driving.md.
-   - **On a stored idea, later**: `recordCritique` with the reviewer's JSON as
-     is, and `respondToFinding` for each answer. That keeps the review with the
-     idea permanently and shows it in the index.
+4. `recordCritique` with the reviewer's JSON as is, show the findings to the
+   person most severe first, and `respondToFinding` for each answer. That keeps
+   the review with the idea permanently and shows it in the index.
 
 ## Prompt for the reviewer
 
