@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Create a new brainstorm data set: a swamp repo with a git-tracked store.
 #
-#   new-dataset.sh <dir> [--source <path-to-brainstorm-extension>] [--no-factory]
+#   create-dataset.sh <dir> [--source <path-to-brainstorm-extension>] [--no-factory]
 #
 # One directory is one data set (for example ~/brainstorm-work). Everything the
 # spec asks for is done here: a relative datastore path, the gitignored
 # .catalog-writers marker, the index report wired to renderIndex only, and the
 # idea factory (the session process, from factory/idea-factory.yaml) installed on
-# @swamp/software-factory. --no-factory skips the last one. The script commits
+# @swamp/stagecraft with its built-in tracker. --no-factory skips the last one. The script commits
 # and pushes nothing.
 set -euo pipefail
 
@@ -50,8 +50,8 @@ swamp behavior create @meris/brainstorm brainstorm > /dev/null
 swamp datastore setup filesystem --path ./store --directories data > /dev/null
 
 # Setup writes an absolute path, which makes every clone use this clone's store.
-# Older swamp wrapped the path (`path: >-` and the value on the next line); newer
-# swamp writes it on one line (possibly with $HOME).
+# The path is either on one line (possibly with $HOME) or folded (`path: >-` and
+# the value on the next line); both become ./store.
 perl -0pi -e 's/(datastore:\n(?:  .*\n)*?  path:) (?:>-\n\s+\S+|\S+)\n/$1 .\/store\n/' .swamp.yaml
 grep -q '^  path: \./store$' .swamp.yaml || {
   echo "error: could not make the datastore path relative in $target/.swamp.yaml" >&2
@@ -76,14 +76,19 @@ if [ "$with_factory" = 1 ]; then
     echo "error: no factory/idea-factory.yaml in $source_dir (use --no-factory)" >&2
     exit 1
   }
-  swamp extension pull @swamp/software-factory --yes > /dev/null
-  swamp model create @swamp/software-factory idea-factory > /dev/null
-  model_file="models/@swamp/software-factory/idea-factory.yaml"
+  swamp extension pull @swamp/stagecraft --yes > /dev/null
+  # A factory needs a tracker. Sessions start under hand-chosen keys, so the
+  # built-in one only satisfies that.
+  swamp model create @swamp/stagecraft/tracker idea-tracker \
+    --global-arg prefix=idea > /dev/null
+  swamp model create @swamp/stagecraft/factory idea-factory \
+    --global-arg tracker=idea-tracker > /dev/null
+  model_file="models/@swamp/stagecraft/factory/idea-factory.yaml"
   [ -f "$model_file" ] || { echo "error: $model_file not found" >&2; exit 1; }
   # Keep the model's identity header (type, id, name, ...); the template supplies
-  # the rest.
-  header="$(grep -vE '^(globalArguments|methods):' "$model_file")"
-  { printf '%s\n\n' "$header"; cat "$template"; } > "$model_file"
+  # the rest, from globalArguments on.
+  header="$(sed '/^globalArguments:/,$d' "$model_file")"
+  { printf '%s\n' "$header"; sed -n '/^globalArguments:/,$p' "$template"; } > "$model_file"
   swamp model method run idea-factory validate > /dev/null || {
     echo "error: the idea factory definition did not validate in $target" >&2
     exit 1
@@ -117,7 +122,8 @@ Created brainstorm data set: $target
 
 Use it from any project:
   export SWAMP_REPO_DIR="$target"
-  swamp model method run idea-factory start --skip-reports --input workItem=<session>
+  swamp model @swamp/stagecraft/work-item method run start <session> \\
+    --input factory=idea-factory --input 'title=<title>'
   swamp behavior run brainstorm renderIndex --report @meris/brainstorm-index
   swamp report get @meris/brainstorm-index --model brainstorm --markdown
 The brainstorm-session skill drives a session; see it for the full loop.

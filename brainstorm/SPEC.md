@@ -2,10 +2,10 @@
 
 Status: draft. Built and tested: the data model and methods (`brainstorm.ts`),
 the index report (`brainstorm_index_report.ts`), the idea factory
-(`factory/idea-factory.yaml`, the session process on `@swamp/software-factory`),
+(`factory/idea-factory.yaml`, the session process on `@swamp/stagecraft`),
 the split workflow (`factory/brainstorm-split.yaml`), the agent skill
 (`.claude/skills/brainstorm-session/`) and the data set script
-(`new-dataset.sh`). The factory enforces the session flow's gates; the stage
+(`create-dataset.sh`). The factory enforces the session flow's gates; the stage
 prompts carry the agent's stance in each phase; the skill is the thin driver.
 The research workflow is **(planned)**.
 
@@ -26,21 +26,21 @@ Swamp data is the only store. There is no note app, no sync and no write-back.
   repos, separate remotes, no cross-set links. Chosen so confidential or
   employer-owned ideas never share a repo with personal ones.
 - **The session is a state machine in data, not a workflow and not prose.** The
-  `@swamp/software-factory` engine has no lifecycle of its own (its source has
-  no software-specific logic); the idea factory definition supplies the stages,
-  gates and agent prompts. This is how swamp's own interactive flows are built:
-  the phase lives in data, gates are checked before a transition, and a skill
-  drives the conversation. Swamp workflows are used where the work is
-  deterministic and repeatable: the split (`brainstorm-split`) and, later,
-  research.
+  `@swamp/stagecraft` engine has no lifecycle of its own; the idea factory
+  definition supplies the stages, gates and agent prompts. This is how swamp's
+  own interactive flows are built: the phase lives in data, gates are checked
+  before a transition, and a skill drives the conversation. Swamp workflows are
+  used where the work is deterministic and repeatable: the split
+  (`brainstorm-split`) and, later, research.
 - **The factory holds the process, brainstorm holds the ideas.** A factory work
   item is one session. The idea's content is written to the brainstorm store
   only at commit, through `captureIdea` (or the split workflow).
 - **Gates make the process consistent; they do not make it trustworthy.** An
   approval is a record anyone can write, including the agent. The skill forbids
   the agent from approving on its own, and a permission rule that asks before
-  any `approve` call is the one real lever. Method outcomes are self-reported;
-  only a `workflow-succeeded` gate is checked against swamp's own run records.
+  any `approve` call is the one real lever. Method and workflow outcomes are
+  self-reported: the driver records the run id and status as result evidence,
+  and stagecraft does not check them against swamp's own run records.
 - **Research is a normal step, recommended often, never forced.**
 - **Recall is `swamp data query`, not a method.**
 
@@ -415,11 +415,11 @@ Planned:
 
 ## Data set layout and bootstrap
 
-One directory per data set, for example `~/brainstorm-work`. `new-dataset.sh`
+One directory per data set, for example `~/brainstorm-work`. `create-dataset.sh`
 does the whole setup and commits and pushes nothing:
 
 ```sh
-brainstorm/new-dataset.sh ~/brainstorm-work
+brainstorm/create-dataset.sh ~/brainstorm-work
 ```
 
 It runs `git init`, `swamp repo init`, `swamp extension source add`, creates the
@@ -510,7 +510,7 @@ Known gaps:
 
 - Two writers editing the same idea conflict in git, and conflict markers make
   swamp fail to parse the data. This is why the store has a single writer.
-- `new-dataset.sh` is not part of the published package: the registry allows
+- `create-dataset.sh` is not part of the published package: the registry allows
   only `.ts`, `.json`, `.md`, `.yaml`, `.yml` and `.txt` as additional files, so
   it is used from a checkout of this repo.
 - The skill is listed in the manifest and packaged on push. Whether a local

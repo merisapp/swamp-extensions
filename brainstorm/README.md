@@ -66,14 +66,15 @@ Do not add `--skip-reports` to `renderIndex`; it skips the index.
 ## The idea factory
 
 A brainstorming session is a work item on the idea factory: the
-`@swamp/software-factory` engine running `factory/idea-factory.yaml`. The
-definition holds the stages (intake, aligning, refining, gate, review, split,
-commit, parked), the gates between them, and the agent's prompt for each phase.
+`@swamp/stagecraft` engine running `factory/idea-factory.yaml` as the
+`idea-factory` factory. The definition holds the stages (intake, aligning, refining, gate,
+review, split, commit, parked), the gates between them, and the agent's prompt
+for each phase, plus saved scenarios that `validate` replays.
 The factory refuses to advance a stage that has not run, a missing record, a
 missing duplicate check, or a missing approval from you. Ideas are written to
 the brainstorm store at commit.
 
-The factory is a separate extension (AGPL-3.0-or-later) that `new-dataset.sh`
+The factory is a separate extension (AGPL-3.0-or-later) that `create-dataset.sh`
 pulls into the data set; this extension does not depend on it in code. Skip it
 with `--no-factory` to use the brainstorm behavior alone. The definition and the
 `brainstorm-split` workflow are templates in `factory/`, installed by the script
@@ -87,10 +88,10 @@ refine it, and commit it through a gate with a duplicate check and an optional
 adversarial review. See [SPEC.md](SPEC.md) for the design.
 
 A data set is a swamp repo with a git-tracked store. Create one with
-`new-dataset.sh` from a checkout of this repo (it commits and pushes nothing):
+`create-dataset.sh` from a checkout of this repo (it commits and pushes nothing):
 
 ```sh
-brainstorm/new-dataset.sh ~/brainstorm-work
+brainstorm/create-dataset.sh ~/brainstorm-work
 export SWAMP_REPO_DIR=~/brainstorm-work   # from any project
 ```
 

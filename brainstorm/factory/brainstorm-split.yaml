@@ -1,9 +1,9 @@
 # Split an idea into sub-ideas: write the parent, then every part, then link each
 # part to the parent. Three jobs in this order because linkIdeas fails for an
 # idea that is not stored yet. The idea factory's `committing-split` stage runs
-# this workflow and its gate checks swamp's own run record for it.
+# this workflow and records its run id and outcome as `split-run` evidence.
 #
-# This is a TEMPLATE. new-dataset.sh installs it: it creates a workflow with
+# This is a TEMPLATE. create-dataset.sh installs it: it creates a workflow with
 # `swamp workflow create brainstorm-split`, keeps that scaffold's `id`, and
 # replaces the rest with this file.
 name: brainstorm-split

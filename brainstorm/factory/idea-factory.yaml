@@ -1,404 +1,658 @@
-# Idea factory: the process for a brainstorming session, as data for the
-# @swamp/software-factory engine. The engine has no lifecycle of its own; every
-# stage, gate and agent prompt below is this file.
+# Idea factory: the process for a brainstorming session, as a factory
+# definition for the @swamp/stagecraft engine. The engine has no lifecycle of
+# its own; every stage, gate and agent prompt below is this file.
 #
-# This is a TEMPLATE. new-dataset.sh installs it into a data set: it creates the
-# model (`swamp model create @swamp/software-factory idea-factory`), keeps that
-# model's identity header, and replaces the rest with this file. Edit the
-# installed copy under models/@swamp/software-factory/ to change a data set; edit
-# this file to change what new data sets get.
-#
-# IDEA FACTORY — the engine is @swamp/software-factory, the machine is this data.
-# A "work item" is one brainstorming session. The idea's content lives in the
-# `brainstorm` behavior (captureIdea writes it at the commit stage); this machine
-# holds only the process: which phase the session is in, what has been recorded,
-# and what a human has approved.
-
-reports:
-  require:
-    - { name: "@swamp/software-factory/work-item-summary", methods: [summary] }
+# This is a TEMPLATE. create-dataset.sh installs it into a data set: it creates the
+# built-in tracker (`idea-tracker`) and the factory model
+# (`swamp model create @swamp/stagecraft/factory idea-factory`), keeps that model's
+# identity header, and replaces the rest with this file. Edit the installed copy
+# under models/@swamp/stagecraft/factory/ to change a data set; edit this file to
+# change what new data sets get. Why each stage and gate exists is in the
+# definition's `description` fields, which the stagecraft studio shows.
 
 globalArguments:
-  stages:
-    - id: intake
-      initial: true
-      description: The person describes the idea loosely. The agent listens.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: LISTENER. The person is describing an idea, loosely, out of
-          order, maybe over several messages. Take it all in.
-          - Keep their own words. Record them as `raw-notes`, exactly as said.
-          - Ask nothing beyond what keeps them talking. No opinions, no
-            restructuring, no interrogation: questions here cut them off.
-          - Do not invent anything.
-          When they have said what they came to say, record `raw-notes` and
-          advance.
-      artifacts:
-        - name: raw-notes
-          schema:
-            type: object
-            required: [notes]
-            properties:
-              notes: {
-                type: array,
-                minItems: 1,
-                items: { type: string, minLength: 1 },
-              }
-      transitions:
-        - name: heard
-          to: aligning
-          gates:
-            - { type: artifact-exists, config: { artifact: raw-notes } }
+  tracker: idea-tracker
+  definition:
+    schemaVersion: 3
+    description: |-
+      A brainstorming session, from a loosely described idea to an idea
+      written in the @meris/brainstorm store. A work item is one session, not
+      one idea: the idea's content lives in the `brainstorm` behavior, which
+      captureIdea writes at the commit stage; this factory holds only the
+      process (which phase the session is in, what has been recorded, and
+      what a person has approved).
 
-    - id: aligning
-      description: Make sure the agent and the person mean the same thing.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: INTERVIEWER. Your goal is to understand the idea AND the
-          problem behind it the way the person does. A clarifying question
-          fills a gap; an alignment question tests whether you mean the same
-          thing. A confident restatement is not a correct one. One or two
-          questions at a time, never a questionnaire:
-          - the problem, not just the solution ("is the problem X, or is X a
-            symptom of something else?");
-          - boundaries with examples ("would Y count?", "what is out of
-            scope?", "what would make you say this isn't what you meant?");
-          - priorities and intent ("which matters most if you can only have
-            one?", "what would you do with this once it exists?").
-          Restate the idea and the problem in your own words and ask the person
-          to confirm or correct. Read the person: a correction, a hesitation,
-          "sort of", an answer to a different question means you are not
-          aligned; go back and check. Record `alignment` with state
-          `confirmed` ONLY if the person actually confirmed, otherwise
-          `unchecked` or `disputed`. Never invent facts.
-      artifacts:
-        - name: alignment
-          schema:
-            type: object
-            required: [restatement, problem, state]
-            properties:
-              restatement: { type: string, minLength: 1 }
-              problem: { type: string, minLength: 1 }
-              boundaries: { type: array, items: { type: string } }
-              state: { type: string, enum: [confirmed, unchecked, disputed] }
-              note: { type: string }
-      transitions:
-        - name: confirmed
-          to: refining
-          gates:
-            - { type: artifact-exists, config: { artifact: alignment } }
-            - type: cel
-              config:
-                expr: 'artifacts.alignment.state == "confirmed"'
-                message: The alignment artifact must record state "confirmed".
-            - { type: human-approval, config: { id: alignment-confirmed } }
-        - name: proceed-unconfirmed
-          to: refining
-          manual: true
-          gates:
-            - { type: artifact-exists, config: { artifact: alignment } }
+      The agent listens, checks it and the person mean the same thing, edits
+      what was gathered into a draft, and runs a duplicate check before
+      anything is written. The person decides at every gold gate: that the
+      restatement is right, that the draft is ready, whether to commit, split,
+      review or discard. Every way back (realign, refine-more, park,
+      back-to-gate) is manual, so only the person takes it.
 
-    - id: refining
-      description: Edit everything gathered into a clear, shareable idea.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: EDITOR AND PARTNER. Edit what was gathered into clear prose of
-          your own, not quotes: a `statement` (one or two plain sentences), a
-          `goal` (what it is for and what success looks like), and `elements`
-          (problem, audience, approach, what makes it different, assumptions,
-          risks, anything else it needs). Where the person has not said
-          something, leave it out and add an open question. Then partner:
-          offer options with a short trade-off and a recommendation, challenge
-          obvious weak spots lightly, connect it to related stored ideas
-          (`swamp data query` on the brainstorm behavior), and revise the
-          draft as detail arrives, saying what changed. The person decides.
-          Record the result as the `draft` artifact.
-      artifacts:
-        - name: draft
-          schema:
-            type: object
-            required: [title, summary, statement, goal]
-            properties:
-              title: { type: string, minLength: 1 }
-              summary: { type: string, minLength: 1 }
-              statement: { type: string, minLength: 1 }
-              goal: { type: string, minLength: 1 }
-              elements: { type: object, additionalProperties: true }
-              openQuestions: { type: array, items: { type: string } }
-              tags: { type: array, items: { type: string } }
-              project: { type: string }
-              status: {
-                type: string,
-                enum: [seed, exploring, parked, dead, shipped],
-              }
-      transitions:
-        - name: ready
-          to: gate
-          gates:
-            - { type: artifact-exists, config: { artifact: draft } }
-            - { type: human-approval, config: { id: draft-ready } }
-        - name: realign
-          to: aligning
+      Sessions are started under a hand-chosen key (`<slug>-<n>`); the
+      tracker exists because a factory needs one, and stages do not drive
+      ticket statuses.
 
-    - id: gate
-      description: Last look before anything is written as an idea.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: CHECKER. Show the finished draft with its open questions and
-          where alignment stands. ALWAYS run the duplicate check yourself
-          first: narrow stored ideas by tag and key words with
-          `swamp data query`, read only the close ones, and sort each match
-          into same-idea / overlaps / opposes / unrelated. Record it as the
-          `duplicate-check` evidence, with the person's decision for each
-          match. Then offer, and run only if the person asks: an adversarial
-          review (transition `review`), research, a comparison against ideas
-          they name. The exits are commit, park, refine-more, or discard.
-      evidence:
-        - name: duplicate-check
-          schema:
-            type: object
-            required: [narrowedBy, matches]
-            properties:
-              narrowedBy: { type: string, minLength: 1 }
-              matches:
-                type: array
-                items:
+    stages:
+      - id: intake
+        initial: true
+        description: The person describes the idea loosely. The agent listens.
+        work:
+          mode: interactive
+          systemPrompt: |
+            STANCE: LISTENER. The person is describing an idea, loosely, out of
+            order, maybe over several messages. Take it all in.
+            - Keep their own words. Record them as `raw-notes`, exactly as said.
+            - Ask nothing beyond what keeps them talking. No opinions, no
+              restructuring, no interrogation: questions here cut them off.
+            - Do not invent anything.
+            When they have said what they came to say, record `raw-notes` and
+            advance.
+        artifacts:
+          - name: raw-notes
+            schema:
+              type: object
+              required: [notes]
+              properties:
+                notes:
+                  type: array
+                  minItems: 1
+                  items: { type: string, minLength: 1 }
+        transitions:
+          - name: heard
+            to: aligning
+            gates:
+              - { type: artifact-exists, config: { artifact: raw-notes } }
+
+      - id: aligning
+        maxCycles: 4
+        description: >-
+          Make sure the agent and the person mean the same thing. Entered again
+          when the person sends a draft back to realign.
+        work:
+          mode: interactive
+          systemPrompt: |
+            STANCE: INTERVIEWER. Your goal is to understand the idea AND the
+            problem behind it the way the person does. A clarifying question
+            fills a gap; an alignment question tests whether you mean the same
+            thing. A confident restatement is not a correct one. One or two
+            questions at a time, never a questionnaire:
+            - the problem, not just the solution ("is the problem X, or is X a
+              symptom of something else?");
+            - boundaries with examples ("would Y count?", "what is out of
+              scope?", "what would make you say this isn't what you meant?");
+            - priorities and intent ("which matters most if you can only have
+              one?", "what would you do with this once it exists?").
+            Restate the idea and the problem in your own words and ask the person
+            to confirm or correct. Read the person: a correction, a hesitation,
+            "sort of", an answer to a different question means you are not
+            aligned; go back and check. Record `alignment` with state
+            `confirmed` ONLY if the person actually confirmed, otherwise
+            `unchecked` or `disputed`. Never invent facts.
+          context:
+            inject: [raw-notes]
+        artifacts:
+          - name: alignment
+            schema:
+              type: object
+              required: [restatement, problem, state]
+              properties:
+                restatement: { type: string, minLength: 1 }
+                problem: { type: string, minLength: 1 }
+                boundaries: { type: array, items: { type: string } }
+                state: { type: string, enum: [confirmed, unchecked, disputed] }
+                note: { type: string }
+        transitions:
+          - name: confirmed
+            to: refining
+            gates:
+              - { type: artifact-exists, config: { artifact: alignment } }
+              - type: cel
+                config:
+                  expr: 'artifacts["alignment"].payload.state == "confirmed"'
+                  message: The alignment artifact must record state "confirmed".
+              - { type: human-approval, config: { id: alignment-confirmed } }
+          - name: proceed-unconfirmed
+            to: refining
+            manual: true
+            description: >-
+              The person chooses to go on without confirming the restatement;
+              the idea is written with its alignment state as recorded.
+            gates:
+              - { type: artifact-exists, config: { artifact: alignment } }
+
+      - id: refining
+        maxCycles: 5
+        description: >-
+          Edit everything gathered into a clear, shareable idea. Entered again
+          when the person sends the session back from the gate, or resumes a
+          parked one.
+        work:
+          mode: interactive
+          systemPrompt: |
+            STANCE: EDITOR AND PARTNER. Edit what was gathered into clear prose of
+            your own, not quotes: a `statement` (one or two plain sentences), a
+            `goal` (what it is for and what success looks like), and `elements`
+            (problem, audience, approach, what makes it different, assumptions,
+            risks, anything else it needs). Where the person has not said
+            something, leave it out and add an open question. Then partner:
+            offer options with a short trade-off and a recommendation, challenge
+            obvious weak spots lightly, connect it to related stored ideas
+            (`swamp data query` on the brainstorm behavior), and revise the
+            draft as detail arrives, saying what changed. The person decides.
+            Record the result as the `draft` artifact.
+          context:
+            inject: [raw-notes, alignment]
+        artifacts:
+          - name: draft
+            schema:
+              type: object
+              required: [title, summary, statement, goal]
+              properties:
+                title: { type: string, minLength: 1 }
+                summary: { type: string, minLength: 1 }
+                statement: { type: string, minLength: 1 }
+                goal: { type: string, minLength: 1 }
+                elements: { type: object, additionalProperties: true }
+                openQuestions: { type: array, items: { type: string } }
+                tags: { type: array, items: { type: string } }
+                project: { type: string }
+                status:
+                  type: string
+                  enum: [seed, exploring, parked, dead, shipped]
+        transitions:
+          - name: ready
+            to: gate
+            gates:
+              - { type: artifact-exists, config: { artifact: draft } }
+              - { type: human-approval, config: { id: draft-ready } }
+          - name: realign
+            to: aligning
+            manual: true
+            description: >-
+              The person says the draft shows the agent misunderstood the idea;
+              go back and check alignment again.
+
+      - id: gate
+        maxCycles: 6
+        description: >-
+          Last look before anything is written as an idea. Entered again after
+          a review, a failed commit, or a split sent back, so the duplicate
+          check is redone each time: the draft may have changed.
+        work:
+          mode: interactive
+          systemPrompt: |
+            STANCE: CHECKER. Show the finished draft with its open questions and
+            where alignment stands. ALWAYS run the duplicate check yourself
+            first: narrow stored ideas by tag and key words with
+            `swamp data query`, read only the close ones, and sort each match
+            into same-idea / overlaps / opposes / unrelated. Record it as the
+            `duplicate-check` evidence, with the person's decision for each
+            match. Then offer, and run only if the person asks: an adversarial
+            review (transition `review`), research, a comparison against ideas
+            they name. The exits are commit, split, park, refine-more, or
+            discard.
+          context:
+            inject: [draft, alignment]
+        evidence:
+          - name: duplicate-check
+            schema:
+              type: object
+              required: [narrowedBy, matches]
+              properties:
+                narrowedBy: { type: string, minLength: 1 }
+                matches:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, verdict, decision]
+                    properties:
+                      id: { type: string }
+                      verdict:
+                        type: string
+                        enum: [same-idea, overlaps, opposes, unrelated]
+                      decision: { type: string }
+        transitions:
+          - name: commit
+            to: committing
+            gates:
+              - { type: evidence-recorded, config: { name: duplicate-check } }
+              - { type: human-approval, config: { id: commit-decision } }
+          - name: review
+            to: review
+            description: >-
+              The person asks for an adversarial review of the draft before
+              deciding.
+            gates:
+              - { type: human-approval, config: { id: review-requested } }
+          - name: split
+            to: splitting
+            gates:
+              - { type: human-approval, config: { id: split-decision } }
+          - name: park
+            to: parked
+            manual: true
+            description: The person stops before deciding; resume later.
+          - name: refine-more
+            to: refining
+            manual: true
+            description: >-
+              The person wants to change the draft before deciding.
+
+      - id: review
+        maxCycles: 3
+        description: >-
+          Optional adversarial review, only when the person asks. A fresh
+          subagent sees only the draft and the stored ideas, never the
+          conversation. The person goes through the findings before the session
+          returns to the gate.
+        work:
+          mode: dispatch
+          systemPrompt: |
+            You are a skeptical reviewer. Your job is to find what is wrong with
+            the idea in the injected `draft`, not to improve it and not to be
+            agreeable. You were not part of the conversation that produced it.
+            Do not modify anything: run no swamp command that writes, edit no
+            file. You may read stored ideas, research and prior art with
+            `swamp data query` on the `brainstorm` behavior.
+
+            Work through these lenses and skip any that do not apply:
+            1. Steelman. State the strongest honest version of the idea, so
+               your critique attacks the idea and not a weak reading of it.
+            2. Premortem. Assume it is a year later and the idea failed. List
+               the plausible reasons. List only; no fixes.
+            3. Assumption map. What must be true for the idea to work? Name the
+               riskiest assumption (important, no evidence) and the cheapest
+               way to test it.
+            4. Devil's advocate. The best case for the alternative: do nothing,
+               use what already exists, or the opposite approach.
+            5. Red team. A competitor, a skeptical user, or someone the idea
+               would hurt: how would they react?
+            6. Prior art. How much of the idea is left once existing work is
+               removed?
+
+            Severity: critical only if the idea cannot work as stated; high if
+            it would likely fail or harm someone unless addressed; medium for a
+            real gap that does not sink it; low for anything else. Findings
+            scale with the idea: a small idea gets a short review.
+
+            Rules: at most seven findings, most severe first. Every finding's
+            description ends with its basis and confidence, for example
+            "(basis: research; high confidence)"; the basis is a stored record,
+            research, a known example, or "reasoning only". A wrong objection
+            is worse than a missing one. Put the lens in `category`. Number
+            findings ADV-1, ADV-2, ... Findings state problems, not fixes.
+            Fill `steelman`, `strengths` and `wouldChangeMind`, and
+            `riskiestAssumption` when you found one. No go/no-go verdict: the
+            person decides.
+          context:
+            inject: [draft]
+        artifacts:
+          - name: review
+            kind: findings
+            reviews: draft
+            schema:
+              type: object
+              properties:
+                steelman: { type: string }
+                strengths: { type: array, items: { type: string } }
+                riskiestAssumption:
                   type: object
-                  required: [id, verdict, decision]
+                  required: [assumption, cheapestTest]
                   properties:
-                    id: { type: string }
-                    verdict: {
-                      type: string,
-                      enum: [same-idea, overlaps, opposes, unrelated],
-                    }
-                    decision: { type: string }
-      transitions:
-        - name: commit
-          to: committing
-          gates:
-            - { type: evidence-recorded, config: { name: duplicate-check } }
-            - { type: human-approval, config: { id: commit-decision } }
-        - name: review
-          to: review
-          gates:
-            - { type: human-approval, config: { id: review-requested } }
-        - name: park
-          to: parked
-          gates:
-            - { type: artifact-exists, config: { artifact: draft } }
-        - name: split
-          to: splitting
-          gates:
-            - { type: artifact-exists, config: { artifact: draft } }
-            - { type: human-approval, config: { id: split-decision } }
-        - name: refine-more
-          to: refining
-        - name: discard
-          to: discarded
-          gates:
-            - { type: human-approval, config: { id: discard-confirmation } }
+                    assumption: { type: string }
+                    cheapestTest: { type: string }
+                wouldChangeMind: { type: string }
+        transitions:
+          - name: reviewed
+            to: gate
+            description: >-
+              Back to the gate with the findings answered, to decide again; the
+              duplicate check is redone there.
+            gates:
+              - type: artifact-fresh
+                config: { artifact: review, recordedThisCycle: true }
+              - type: human-approval
+                description: >-
+                  The person has gone through the findings; their answers are
+                  recorded on the review as resolved and resolutionNote.
+                config: { id: review-discussed }
 
-    - id: review
-      description: Optional adversarial review, only when the person asks.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: SKEPTIC, in a SEPARATE agent. You are too close to this draft
-          to attack it: run the review in a fresh-context subagent that sees
-          only the stored draft, as the brainstorm-session skill describes, and
-          record what it returns. The reviewer's job is to find what is wrong
-          with the draft; it must not improve it and must not be agreeable. Lenses: steelman first, premortem (list
-          only, no fixes), assumption map (name the riskiest assumption and the
-          cheapest test), devil's advocate, red team, prior art. At most seven
-          findings, most severe first. Every finding states its basis (a stored
-          record, research, a known example, or "reasoning only"); a wrong
-          objection is worse than a missing one. Problems, not fixes. Say what
-          is strong and what would change your mind. No go/no-go verdict.
-          Record the `review` findings.
-      artifacts:
-        - name: review
-          kind: findings
-          reviews: draft
-      transitions:
-        - name: reviewed
-          to: gate
-          gates:
-            - { type: artifact-exists, config: { artifact: review } }
+      - id: committing
+        maxCycles: 3
+        description: Write the idea to the store through the brainstorm behavior.
+        work:
+          mode: method
+          method:
+            modelIdOrName: brainstorm
+            methodName: captureIdea
+            passAsInputs:
+              - title
+              - summary
+              - statement
+              - goal
+              - elements
+              - openQuestions
+              - tags
+              - rawNotes
+              - alignment
+              - status
+              - project
+          let:
+            title: artifacts["draft"].payload.title
+            summary: artifacts["draft"].payload.summary
+            statement: artifacts["draft"].payload.statement
+            goal: artifacts["draft"].payload.goal
+            elements: >-
+              "elements" in artifacts["draft"].payload
+              ? artifacts["draft"].payload.elements : {}
+            openQuestions: >-
+              "openQuestions" in artifacts["draft"].payload
+              ? artifacts["draft"].payload.openQuestions : []
+            tags: >-
+              "tags" in artifacts["draft"].payload
+              ? artifacts["draft"].payload.tags : []
+            rawNotes: artifacts["raw-notes"].payload.notes
+            alignment: >-
+              {"state": artifacts["alignment"].payload.state,
+              "note": "note" in artifacts["alignment"].payload
+              ? artifacts["alignment"].payload.note : ""}
+            status: >-
+              "status" in artifacts["draft"].payload
+              ? artifacts["draft"].payload.status : "seed"
+            project: >-
+              "project" in artifacts["draft"].payload
+              ? artifacts["draft"].payload.project : ""
+          resultEvidence: commit-run
+        transitions:
+          - name: written
+            to: committed
+            gates:
+              - type: evidence-recorded
+                config: { name: commit-run, requireField: { status: succeeded } }
+          - name: failed
+            to: gate
+            description: >-
+              captureIdea failed; back to the gate to fix the draft or decide
+              again.
+            gates:
+              - type: evidence-recorded
+                config: { name: commit-run, requireField: { status: failed } }
 
-    - id: committing
-      description: Write the idea to the store through the brainstorm behavior.
-      work:
-        mode: method
-        method:
-          modelIdOrName: brainstorm
-          methodName: captureIdea
-          inputs:
-            title: '${{ data.latest(self.name, "artifact-draft").payload.title }}'
-            summary: '${{ data.latest(self.name, "artifact-draft").payload.summary }}'
-            statement: '${{ data.latest(self.name, "artifact-draft").payload.statement }}'
-            goal: '${{ data.latest(self.name, "artifact-draft").payload.goal }}'
-            elements: '${{ data.latest(self.name, "artifact-draft").payload.?elements.orValue({}) }}'
-            openQuestions: '${{ data.latest(self.name, "artifact-draft").payload.?openQuestions.orValue([]) }}'
-            tags: '${{ data.latest(self.name, "artifact-draft").payload.?tags.orValue([]) }}'
-            rawNotes: '${{ data.latest(self.name, "artifact-raw-notes").payload.notes }}'
-            alignment:
-              state: '${{ data.latest(self.name, "artifact-alignment").payload.state }}'
-              note: '${{ data.latest(self.name, "artifact-alignment").payload.?note.orValue("") }}'
-            status: '${{ data.latest(self.name, "artifact-draft").payload.?status.orValue("seed") }}'
-            project: '${{ data.latest(self.name, "artifact-draft").payload.?project.orValue("") }}'
-        resultEvidence: commit-run
-      transitions:
-        - name: written
-          to: committed
-          gates:
-            - type: evidence-recorded
-              config: { name: commit-run, requireField: { status: succeeded } }
-        - name: failed
-          to: gate
-          gates:
-            - type: evidence-recorded
-              config: { name: commit-run, requireField: { status: failed } }
-
-    - id: splitting
-      description: Break the idea into sub-ideas, as components or as offshoots.
-      work:
-        mode: interactive
-        systemPrompt: |
-          STANCE: EDITOR, splitting one idea into several. Two kinds, and the
-          person decides which:
-          - component: the parts together make the whole. Each part links
-            `part-of` the parent; the parent becomes the umbrella, so rewrite its
-            statement to describe the whole and name the parts in its elements.
-          - offshoot: new ideas that came out of a parent that stays whole. Each
-            links `spawned-from` the parent; leave the parent as it is.
-          Draft every part as its own idea: a title, summary, statement and goal
-          of its own, and its own alignment check with the person
-          (`alignmentState` is `confirmed` only if they confirmed that part).
-          Ids are the title in lowercase with every run of non-letters and
-          non-digits turned into one hyphen, at most 60 characters, so
-          "Conflict Policy" is `conflict-policy`; a wrong id makes the links
-          fail. Run the duplicate check on EVERY part (a part may already exist as
-          an idea of its own) and record it as `split-check`, with the person's
-          decision per match. The parent's `status` is the person's call and is
-          required: keep its current status unless they say otherwise, and
-          never mark the parent dead unless they say so. A part can be split again later in its own session.
-      artifacts:
-        - name: split
-          schema:
-            type: object
-            required: [kind, parent, parts]
-            properties:
-              kind: { type: string, enum: [component, offshoot] }
-              parent:
-                type: object
-                required: [id, title, summary, statement, goal, status]
-                properties:
-                  id: { type: string, minLength: 1 }
-                  title: { type: string, minLength: 1 }
-                  summary: { type: string, minLength: 1 }
-                  statement: { type: string, minLength: 1 }
-                  goal: { type: string, minLength: 1 }
-                  status: {
-                    type: string,
-                    enum: [seed, exploring, parked, dead, shipped],
-                  }
-                  elements: { type: object, additionalProperties: true }
-              parts:
-                type: array
-                minItems: 1
-                items:
+      - id: splitting
+        maxCycles: 3
+        description: >-
+          Break the idea into sub-ideas, as components or as offshoots.
+          Entered again when writing the split fails.
+        work:
+          mode: interactive
+          systemPrompt: |
+            STANCE: EDITOR, splitting one idea into several. Two kinds, and the
+            person decides which:
+            - component: the parts together make the whole. Each part links
+              `part-of` the parent; the parent becomes the umbrella, so rewrite its
+              statement to describe the whole and name the parts in its elements.
+            - offshoot: new ideas that came out of a parent that stays whole. Each
+              links `spawned-from` the parent; leave the parent as it is.
+            Draft every part as its own idea: a title, summary, statement and goal
+            of its own, and its own alignment check with the person
+            (`alignmentState` is `confirmed` only if they confirmed that part).
+            Ids are the title in lowercase with every run of non-letters and
+            non-digits turned into one hyphen, at most 60 characters, so
+            "Conflict Policy" is `conflict-policy`; a wrong id makes the links
+            fail. Run the duplicate check on EVERY part (a part may already exist as
+            an idea of its own) and record it as `split-check`, with the person's
+            decision per match. The parent's `status` is the person's call and is
+            required: keep its current status unless they say otherwise, and
+            never mark the parent dead unless they say so. A part can be split again later in its own session.
+          context:
+            inject: [draft]
+        artifacts:
+          - name: split
+            schema:
+              type: object
+              required: [kind, parent, parts]
+              properties:
+                kind: { type: string, enum: [component, offshoot] }
+                parent:
                   type: object
-                  required: [
-                    id,
-                    title,
-                    summary,
-                    statement,
-                    goal,
-                    alignmentState,
-                  ]
+                  required: [id, title, summary, statement, goal, status]
                   properties:
                     id: { type: string, minLength: 1 }
                     title: { type: string, minLength: 1 }
                     summary: { type: string, minLength: 1 }
                     statement: { type: string, minLength: 1 }
                     goal: { type: string, minLength: 1 }
-                    alignmentState: {
-                      type: string,
-                      enum: [confirmed, unchecked, disputed],
-                    }
-                    alignmentNote: { type: string }
+                    status:
+                      type: string
+                      enum: [seed, exploring, parked, dead, shipped]
                     elements: { type: object, additionalProperties: true }
-      evidence:
-        - name: split-check
-          schema:
-            type: object
-            required: [narrowedBy, matches]
-            properties:
-              narrowedBy: { type: string, minLength: 1 }
-              matches:
-                type: array
-                items:
-                  type: object
-                  required: [id, verdict, decision]
-                  properties:
-                    id: { type: string }
-                    verdict: {
-                      type: string,
-                      enum: [same-idea, overlaps, opposes, unrelated],
-                    }
-                    decision: { type: string }
-      transitions:
-        - name: ready
-          to: committing-split
-          gates:
-            - { type: artifact-exists, config: { artifact: split } }
-            - { type: evidence-recorded, config: { name: split-check } }
-            - { type: human-approval, config: { id: split-ready } }
-        - name: back-to-gate
-          to: gate
+                parts:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      [id, title, summary, statement, goal, alignmentState]
+                    properties:
+                      id: { type: string, minLength: 1 }
+                      title: { type: string, minLength: 1 }
+                      summary: { type: string, minLength: 1 }
+                      statement: { type: string, minLength: 1 }
+                      goal: { type: string, minLength: 1 }
+                      alignmentState:
+                        type: string
+                        enum: [confirmed, unchecked, disputed]
+                      alignmentNote: { type: string }
+                      elements: { type: object, additionalProperties: true }
+        evidence:
+          - name: split-check
+            schema:
+              type: object
+              required: [narrowedBy, matches]
+              properties:
+                narrowedBy: { type: string, minLength: 1 }
+                matches:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, verdict, decision]
+                    properties:
+                      id: { type: string }
+                      verdict:
+                        type: string
+                        enum: [same-idea, overlaps, opposes, unrelated]
+                      decision: { type: string }
+        transitions:
+          - name: ready
+            to: committing-split
+            gates:
+              - { type: artifact-exists, config: { artifact: split } }
+              - { type: evidence-recorded, config: { name: split-check } }
+              - { type: human-approval, config: { id: split-ready } }
+          - name: back-to-gate
+            to: gate
+            manual: true
+            description: The person decides not to split after all.
 
-    - id: committing-split
-      description: Write the parent, the parts and their links through one workflow.
-      work:
-        mode: workflow
-        workflow:
-          name: brainstorm-split
-          inputs:
-            kind: '${{ data.latest(self.name, "artifact-split").payload.kind }}'
-            parent: '${{ data.latest(self.name, "artifact-split").payload.parent }}'
-            parts: '${{ data.latest(self.name, "artifact-split").payload.parts }}'
-        resultEvidence: split-run
-      transitions:
-        - name: written
-          to: committed
-          gates:
-            - {
-                type: workflow-succeeded,
-                config: { workflow: brainstorm-split },
-              }
-        - name: failed
-          to: splitting
-          gates:
-            - type: evidence-recorded
-              config: { name: split-run, requireField: { status: failed } }
+      - id: committing-split
+        maxCycles: 3
+        description: >-
+          Write the parent, the parts and their links through the
+          brainstorm-split workflow.
+        work:
+          mode: workflow
+          workflow:
+            name: brainstorm-split
+            passAsInputs: [kind, parent, parts]
+          let:
+            kind: artifacts["split"].payload.kind
+            parent: artifacts["split"].payload.parent
+            parts: artifacts["split"].payload.parts
+          resultEvidence: split-run
+        transitions:
+          - name: written
+            to: committed
+            gates:
+              - type: evidence-recorded
+                config: { name: split-run, requireField: { status: succeeded } }
+          - name: failed
+            to: splitting
+            description: >-
+              The brainstorm-split run failed; back to splitting to fix the
+              split. Rerunning is safe: ideas merge by title and links
+              overwrite as new versions.
+            gates:
+              - type: evidence-recorded
+                config: { name: split-run, requireField: { status: failed } }
 
-    - id: parked
-      description: Saved as work in progress. Resume later.
-      transitions:
-        - name: resume
-          to: refining
+      - id: parked
+        description: Saved as work in progress. Resume later.
+        transitions:
+          - name: resume
+            to: refining
+            manual: true
+            description: The person picks the session up again.
+
+      - id: committed
+        terminal: true
+
+      - id: discarded
+        terminal: true
+
+    globalTransitions:
+      - name: discard
+        to: discarded
+        gates:
+          - { type: human-approval, config: { id: discard-confirmation } }
+  scenarios:
+    - scenario: listen-to-commit
+      description: >-
+        A session walks from intake to a written idea. Each gold gate waits for
+        the person, and commit waits for the duplicate check.
+      steps:
+        - record: { artifact: raw-notes }
+          payload: { notes: [I keep losing writes when my phone drops signal.] }
+        - move: heard
+        - record: { artifact: alignment }
+          payload:
+            restatement: Queue writes locally and sync when signal returns.
+            problem: Writes are lost offline.
+            state: confirmed
+        - move: confirmed
+          expect: { refused: "awaiting approval 'alignment-confirmed'" }
+        - approve: alignment-confirmed
+        - move: confirmed
+        - record: { artifact: draft }
+          payload:
+            title: Offline sync
+            summary: Queue writes locally and sync later.
+            statement: Writes made offline are queued and synced on reconnect.
+            goal: No lost writes.
+        - approve: draft-ready
+        - move: ready
+        - expect: { stage: gate }
+        - approve: commit-decision
+        - move: commit
+          expect: { refused: "evidence 'duplicate-check' has not been recorded" }
+        - record: { evidence: duplicate-check }
+          payload: { narrowedBy: "tag sync; words: offline, queue", matches: [] }
+        - move: commit
+        - record: { evidence: commit-run }
+          payload: { status: succeeded, runId: run-1 }
+        - move: written
+        - expect: { stage: committed }
+    - scenario: unconfirmed-alignment
+      description: >-
+        The person does not confirm the restatement. confirmed is refused; the
+        person can still go on by hand.
+      steps:
+        - record: { artifact: raw-notes }
+          payload: { notes: [Something about sync.] }
+        - move: heard
+        - record: { artifact: alignment }
+          payload: { restatement: Sync, problem: Unclear, state: disputed }
+        - move: confirmed
+          expect: { refused: 'must record state "confirmed"' }
+        - move: proceed-unconfirmed
           manual: true
-        - name: discard
-          to: discarded
-          gates:
-            - { type: human-approval, config: { id: discard-confirmation } }
-
-    - id: committed
-      terminal: true
-
-    - id: discarded
-      terminal: true
+        - expect: { stage: refining }
+    - scenario: review-then-recheck
+      description: >-
+        A review returns to the gate only after the person has gone through the
+        findings, and the duplicate check from before the review no longer
+        counts.
+      steps:
+        - record: { artifact: raw-notes }
+          payload: { notes: [An idea.] }
+        - move: heard
+        - record: { artifact: alignment }
+          payload: { restatement: R, problem: P, state: confirmed }
+        - approve: alignment-confirmed
+        - move: confirmed
+        - record: { artifact: draft }
+          payload: { title: T, summary: S, statement: St, goal: G }
+        - approve: draft-ready
+        - move: ready
+        - record: { evidence: duplicate-check }
+          payload: { narrowedBy: words, matches: [] }
+        - approve: review-requested
+        - move: review
+        - record: { artifact: review }
+          payload:
+            findings:
+              - id: ADV-1
+                severity: high
+                description: "Nobody asked for it (basis: reasoning only; low confidence)"
+        - move: reviewed
+          expect: { refused: "awaiting approval 'review-discussed'" }
+        - approve: review-discussed
+        - move: reviewed
+        - expect: { stage: gate }
+        - approve: commit-decision
+        - move: commit
+          expect: { refused: "not in this entry" }
+    - scenario: split-retry
+      description: >-
+        A split whose workflow run fails goes back to splitting, then writes on
+        the second run.
+      steps:
+        - record: { artifact: raw-notes }
+          payload: { notes: [A big idea.] }
+        - move: heard
+        - record: { artifact: alignment }
+          payload: { restatement: R, problem: P, state: confirmed }
+        - approve: alignment-confirmed
+        - move: confirmed
+        - record: { artifact: draft }
+          payload: { title: Big, summary: S, statement: St, goal: G }
+        - approve: draft-ready
+        - move: ready
+        - approve: split-decision
+        - move: split
+        - record: { artifact: split }
+          payload:
+            kind: offshoot
+            parent:
+              { id: big, title: Big, summary: S, statement: St, goal: G, status: seed }
+            parts:
+              - { id: small, title: Small, summary: S, statement: St, goal: G, alignmentState: confirmed }
+        - record: { evidence: split-check }
+          payload: { narrowedBy: words, matches: [] }
+        - approve: split-ready
+        - move: ready
+        - record: { evidence: split-run }
+          payload: { status: failed, runId: run-1 }
+        - move: written
+          expect: { refused: "status" }
+        - move: failed
+        - expect: { stage: splitting }
+        - record: { evidence: split-check }
+          payload: { narrowedBy: words, matches: [] }
+        - approve: split-ready
+        - move: ready
+        - record: { evidence: split-run }
+          payload: { status: succeeded, runId: run-2 }
+        - move: written
+        - expect: { stage: committed }
+methods: {}
